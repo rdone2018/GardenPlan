@@ -22,7 +22,7 @@ Database of gardens in system (multiple gardens possible)
    - Reports
       - vegetables (numbers, increase per year,...)
       - costs
-   - Mesh view for garden with picture/map background
+   - Mesh view (Excel sheet like) for garden with picture/map background
       - allow drag&drop vegetable to cells 
       - view cell content - breif + on click all details (incl. photos, links , calendar and data downloaded from Web)
       - editable cells - add, change, delete, move from cell to cell
