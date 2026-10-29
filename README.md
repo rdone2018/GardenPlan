@@ -4,7 +4,7 @@ Plannig and monitoring garden
 Ideas:
 Database of gardens in system (multiple gardens possible)
 - define location of garden -> Weather + calculation of Sun shine times
-- Mesh definition, how big garden is = many cells with x height
+- Mesh definition, how big garden is = how many cells with x height
 
 - for every garden:
    - DB with vegetables (can be shared between Gardens)
