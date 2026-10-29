@@ -5,6 +5,7 @@ Ideas:
 Database of gardens in system (multiple gardens possible)
 - define location of garden -> Weather + calculation of Sunshine times
 - Mesh definition, how big garden is = how many cells with x height
+    - per cell conditions - e.g. in shadow, wet, ...
 
 - for every garden:
    - Database with vegetables (can be shared between Gardens)
