@@ -4,10 +4,11 @@ Plannig and monitoring garden
 Ideas:
 
 Database of gardens in application (multiple gardens possible)
+- Owner
+- Garden type
 - define location of garden -> Weather + calculation of Sunshine times
 - Mesh definition, how big garden is = how many cells with x height
-    - per cell conditions - e.g. in shadow, wet, ...
-
+    - per cell environment conditions config - e.g. in shadow, wet, ...
 - for every garden:
    - Database with vegetables (can be shared between Gardens)
       - type
