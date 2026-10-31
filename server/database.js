@@ -20,6 +20,7 @@ export const pool = mariadb.createPool({
   database: process.env.DB_NAME || 'gardenplan',
   user: process.env.DB_USER || 'gardenplan',
   password: process.env.DB_PASSWORD,
+  jsonStrings: true,
   connectionLimit: 5,
   decimalAsNumber: true,
   // Fail with an error instead of waiting forever for a free connection or a blocked query.
