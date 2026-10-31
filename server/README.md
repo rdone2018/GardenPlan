@@ -13,18 +13,22 @@ FLUSH PRIVILEGES;
 ```
 Běží-li MariaDB na jiném stroji než server, použijte místo `'localhost'` adresu serveru (nebo `'%'`).
 
-Tabulky (`gardens`, `plants`, `placements`, `equipment`, `tasks`, `meta`) server vytvoří sám při prvním spuštění –
-viz `schema.sql`. Každý řádek má čitelné sloupce (název, latinský název, zahrada…) a celý záznam v JSON ve sloupci `data`.
+Tabulky (`gardens`, `plants`, `placements`, `equipment`, `tasks`, `meta`) vytvoří `initDatabase()` v `database.js`
+sám při prvním spuštění (a při každém dalším jen ověří, že existují) – viz `schema.sql`. Každý řádek má čitelné sloupce (název, latinský název, zahrada…) a celý záznam v JSON ve sloupci `data`.
 
 ## 2. Instalace na Pi
 ```bash
 git clone https://github.com/rdone2018/GardenPlan.git
 cd GardenPlan/server
 npm install
-cp .env.example .env
-nano .env        # doplňte DB_PASSWORD (případně DB_USER, DB_HOST)
+sudo mkdir -p /etc/gardenplan
+sudo cp .env.example /etc/gardenplan/gardenplan.env
+sudo nano /etc/gardenplan/gardenplan.env      # doplňte DB_PASSWORD (případně DB_USER, DB_HOST)
+sudo chown root:pi /etc/gardenplan/gardenplan.env && sudo chmod 640 /etc/gardenplan/gardenplan.env
 node server.js   # zkušební spuštění
 ```
+Konfiguraci načítá `database.js` v tomto pořadí: soubor z proměnné `GARDENPLAN_ENV_FILE`,
+pak `/etc/gardenplan/gardenplan.env`, nakonec `server/.env` (pro vývoj). Hodnota nastavená v prostředí má vždy přednost.
 Má se vypsat `GardenPlan: http://localhost:8080 (database gardenplan @ localhost)`.
 Pak na počítači nebo mobilu otevřete `http://<adresa-pi>:8080` (adresu zjistíte na Pi příkazem `hostname -I`).
 Vpravo nahoře se ukáže „✓ Připojeno k databázi“, na stránce **Data** je „Data se ukládají do databáze MariaDB“.
@@ -52,4 +56,5 @@ Data zadaná dříve v prohlížeči (otevřením `index.html`) jsou jen v tom p
 
 ## Bezpečnost
 Server nemá přihlašování – je určen pro domácí síť. Nevystavujte port 8080 do internetu
-(přístup zvenku řešte přes VPN, např. WireGuard / Tailscale). Soubor `.env` s heslem se do gitu neukládá.
+(přístup zvenku řešte přes VPN, např. WireGuard / Tailscale). Soubor s heslem je mimo repozitář (`/etc/gardenplan`),
+případný `server/.env` git ignoruje.

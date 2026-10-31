@@ -10,6 +10,8 @@ After=network.target mariadb.service
 User=pi
 WorkingDirectory=/home/pi/GardenPlan/server
 ExecStart=/usr/bin/env node server.js
+# Configuration is read from /etc/gardenplan/gardenplan.env by database.js;
+# to use another file: Environment=GARDENPLAN_ENV_FILE=/path/to/file.env
 Restart=on-failure
 RestartSec=5
 

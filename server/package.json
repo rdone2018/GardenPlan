@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "GardenPlan web server: serves the app and stores data in MariaDB",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -11,6 +12,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "mariadb": "^3.4.0"
   }

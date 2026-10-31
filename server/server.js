@@ -1,32 +1,13 @@
 // GardenPlan server: serves the web app and stores its data in MariaDB.
-// Start: node server.js   (settings in .env next to this file, see .env.example)
-const fs = require('fs');
-const path = require('path');
-const express = require('express');
-const mariadb = require('mariadb');
+// Start: node server.js   (configuration: see database.js and .env.example)
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import express from 'express';
+import { pool, initDatabase } from './database.js';
 
-// ---------- config ----------
-function loadEnv(file) {
-  if (!fs.existsSync(file)) return;
-  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/i);
-    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
-  }
-}
-loadEnv(path.join(__dirname, '.env'));
-const env = process.env;
-const PORT = +(env.PORT || 8080);
-const APP_DIR = path.join(__dirname, '..');
-
-const pool = mariadb.createPool({
-  host: env.DB_HOST || 'localhost',
-  port: +(env.DB_PORT || 3306),
-  user: env.DB_USER,
-  password: env.DB_PASSWORD,
-  database: env.DB_NAME || 'gardenplan',
-  connectionLimit: 5,
-  charset: 'utf8mb4'
-});
+const env = process.env; // filled from the env file by database.js
+const PORT = Number(env.PORT) || 8080;
+const APP_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // ---------- tables ----------
 // Collection in the app -> table and the columns copied out of the JSON object.
@@ -39,17 +20,6 @@ const COLLECTIONS = {
   tasks: { table: 'tasks', cols: t => ({ garden_id: t.gardenId || null, title: str(t.title) }) }
 };
 const META_KEYS = ['settings', 'taskDone', 'version'];
-
-async function createTables() {
-  const sql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8')
-    .split(/;\s*(?:\r?\n|$)/).map(s => s.replace(/^\s*--.*$/gm, '').trim()).filter(Boolean);
-  const conn = await pool.getConnection();
-  try {
-    for (const stmt of sql) await conn.query(stmt);
-  } finally {
-    conn.release();
-  }
-}
 
 async function upsert(conn, name, objects) {
   const c = COLLECTIONS[name];
@@ -154,10 +124,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message });
 });
 
-createTables()
+initDatabase()
   .then(() => app.listen(PORT, () => console.log('GardenPlan: http://localhost:' + PORT + '  (database ' + (env.DB_NAME || 'gardenplan') + ' @ ' + (env.DB_HOST || 'localhost') + ')')))
   .catch(e => {
     console.error('Cannot connect to MariaDB / create tables:', e.message);
-    console.error('Check DB_HOST, DB_USER, DB_PASSWORD and DB_NAME in server/.env');
+    console.error('Check DB_HOST, DB_USER, DB_PASSWORD and DB_NAME in /etc/gardenplan/gardenplan.env (or server/.env)');
     process.exit(1);
   });
