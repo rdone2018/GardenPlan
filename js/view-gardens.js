@@ -144,7 +144,15 @@
     g.surroundD = g.surroundD || {};
     for (const k in g.surround) if (g.surround[k] === 'trees') g.surround[k] = 'selfsown';
     if (g.soilPh && !GP.SOIL_PH.some(o => o[0] === g.soilPh)) { g.soilPhValue = g.soilPh; g.soilPh = GP.phCategory(g.soilPh); }
+    // Separate soil / surroundings notes were merged into the single notes field.
+    for (const k of ['soilNote', 'surroundings']) {
+      if (g[k] && g[k].trim()) g.notes = [g.notes, g[k].trim()].filter(Boolean).join('\n');
+      delete g[k];
+    }
+    // Tank / butt capacity is a number in m³ ("10 m³" -> "10")
+    for (const w of g.water) if (w.capacity && /m3|m³/.test(w.capacity)) w.capacity = w.capacity.replace(/\s*m[3³]\s*/g, '').trim();
   }
+  const HAS_VOLUME = ['tank', 'barrel'];
 
   // "JV + 2–7°" -> human sentence
   function slopeText(g) {
@@ -200,13 +208,13 @@
       (g.aspectNote ? '<input type="text" data-k="aspectNote" value="' + esc(g.aspectNote) + '">' : '') + '</div>' +
       '<div class="field"><span class="lbl">' + L('Typ půdy (lze vybrat více)', 'Soil type (several allowed)') + '</span><div class="chips" data-chips="soils">' +
       GP.SOILS.map(s => '<button type="button" class="chip' + (g.soils.includes(s[0]) ? ' on' : '') + '" data-v="' + s[0] + '">' + esc(L(s[1], s[2])) + '</button>').join('') + '</div>' +
-      '<input type="text" data-k="soilNote" value="' + esc(g.soilNote) + '" placeholder="' + L('poznámka k půdě (kde je jaká…)', 'soil note (where is which…)') + '"></div>' +
+      '</div>' +
       '<div class="field"><span class="lbl">' + L('Půdní reakce (pH)', 'Soil reaction (pH)') + '</span><div class="row gap">' +
       selectHtml(GP.SOIL_PH, g.soilPh, 'data-k="soilPh" id="phSel"') +
-      '<label class="row small">' + L('naměřeno', 'measured') + ' <input type="text" inputmode="decimal" class="num" data-k="soilPhValue" value="' + esc(g.soilPhValue) + '" placeholder="6,5"></label></div></div>' +
+      '<label class="row small">' + L('naměřeno', 'measured') + ' <input type="text" inputmode="decimal" class="num" data-k="soilPhValue" value="' + esc(g.soilPhValue) + '"></label></div></div>' +
       '<div class="field"><span class="lbl">' + L('Zdroje vody', 'Water sources') + '</span><div id="water">' +
       g.water.map((w, i) => '<div class="water-row" data-w="' + i + '">' + selectHtml(GP.WATER_SOURCES, w.type, 'data-wk="type"') +
-        '<input type="text" data-wk="capacity" value="' + esc(w.capacity) + '" placeholder="' + L('kapacita, např. 10 m³', 'capacity, e.g. 10 m³') + '">' +
+        (HAS_VOLUME.includes(w.type) ? '<label class="row small">' + L('objem', 'volume') + ' <input type="text" inputmode="decimal" class="num" data-wk="capacity" value="' + esc(w.capacity) + '"> m³</label>' : '<span></span>') +
         '<input type="text" data-wk="note" value="' + esc(w.note) + '" placeholder="' + L('poznámka', 'note') + '"><button class="link danger" data-delw="' + i + '">✕</button></div>').join('') +
       '</div><button class="btn small" data-act="addwater">+ ' + L('Přidat zdroj vody', 'Add water source') + '</button></div>' +
       '<div class="field"><span class="lbl">' + L('Okolí zahrady', 'Surroundings') + '</span><div class="sides">' +
@@ -214,8 +222,7 @@
         '<div class="row gap small"><label class="row">' + L('výška', 'height') + ' <input type="text" inputmode="decimal" class="num" data-k="surroundH.' + k + '" value="' + esc(g.surroundH[k]) + '"> m</label>' +
         '<label class="row" title="' + L('Vzdálenost překážky od hranice zahrady', 'Distance of the obstacle from the garden boundary') + '">' + L('od hranice', 'from edge') +
         ' <input type="text" inputmode="decimal" class="num" data-k="surroundD.' + k + '" value="' + esc(g.surroundD[k]) + '"> m</label></div>' +
-        '<div class="small warn-text" id="shade-' + k + '">' + esc(shadeText(g, k)) + '</div></div>').join('') + '</div>' +
-      '<textarea data-k="surroundings" rows="2" placeholder="' + L('podrobnosti: výška stromů, stín, vítr…', 'details: tree height, shade, wind…') + '">' + esc(g.surroundings) + '</textarea></div>' +
+        '<div class="small warn-text" id="shade-' + k + '">' + esc(shadeText(g, k)) + '</div></div>').join('') + '</div></div>' +
       GP.ui.field({ key: 'notes', type: 'longtext', cs: 'Poznámky', en: 'Notes' }, g.notes) + '</div></div>';
 
     const hasGps = !isNaN(num(g.lat)) && !isNaN(num(g.lon));
@@ -269,6 +276,7 @@
       const row = e.target.closest('[data-w]'), k = e.target.dataset.wk;
       if (!row || !k) return;
       g.water[+row.dataset.w][k] = e.target.value;
+      if (k === 'type' && e.type === 'change') { GP.saveNow(); GP.render(); return; } // volume field only for tanks
       GP.save();
     };
     water.addEventListener('input', wupd);
