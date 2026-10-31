@@ -5,7 +5,7 @@
 
   function targetOptions(cur) {
     const opt = (v, label) => '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + esc(label) + '</option>';
-    let html = opt('', '— ' + L('nepoužít', 'skip') + ' —');
+    let html = opt('', '— ' + L('nepoužít', 'skip') + ' —') + opt('match:name', L('Původní název (podle něj najít rostlinu)', 'Original name (find the plant by it)'));
     const groups = GP.groups();
     for (let gi = 0; gi < groups.length; gi++) {
       html += '<optgroup label="' + esc(groups[gi][0]) + '">';
@@ -73,6 +73,8 @@
         // The same target twice -> keep only the first (care items and long texts may take several columns)
         const seen = new Set(), multi = t => { const f = GP.plantField(t.replace(/^plant:/, '').split('.')[0]); return f && (f.type === 'care' || f.type === 'longtext'); };
         imp.map = imp.map.map(t => (t && seen.has(t) && !multi(t) ? '' : (seen.add(t), t)));
+        // a file that names the plants by their original name is meant to rewrite them (e.g. cleaned names)
+        if (imp.map.includes('match:name')) imp.fillOnly = false;
         GP.render();
       };
       if (!imp || imp.result) return;
@@ -90,6 +92,7 @@
     const thisRun = new Set(), runPlaced = new Map();
     for (const row of imp.rows) {
       const data = {}, place = {}, extra = [];
+      let matchName = '';
       imp.headers.forEach((h, i) => {
         const raw = (row[i] || '').trim();
         if (!raw) return;
@@ -97,6 +100,7 @@
         if (!t) { if (imp.extraToNotes) extra.push(h + ': ' + raw); return; }
         const [kind, path] = t.split(':');
         if (kind === 'place') { place[path] = raw; return; }
+        if (kind === 'match') { matchName = raw; return; }
         const [key, sub] = path.split('.');
         const f = fieldOf(key);
         if (f.type === 'care') {
@@ -140,8 +144,11 @@
       // An unidentified plant only merges with another unidentified one of the same name, never with a known species;
       // different cultivars / rootstocks stay separate plants.
       const same = (a, b) => a && b && GP.norm(a) === GP.norm(b);
-      let p = GP.state.plants.find(x => !x.unsure === !data.unsure && GP.norm(x.cultivar) === GP.norm(data.cultivar) && GP.norm(x.rootstock) === GP.norm(data.rootstock) &&
-        (same(x.name_la, data.name_la) || (!data.name_la && same(x.name_cs, data.name_cs)) || (!data.name_la && !data.name_cs && same(x.name_sk, data.name_sk))));
+      // with a "Původní název" column the plant is found by its current Czech name (the file may rename it)
+      const noQ = s => (s || '').replace(/\?/g, ''); // "Višeň ???" also finds an unidentified "Višeň"
+      let p = matchName ? GP.state.plants.find(x => !thisRun.has(x.id) && same(noQ(x.name_cs), noQ(matchName))) :
+        GP.state.plants.find(x => !x.unsure === !data.unsure && GP.norm(x.cultivar) === GP.norm(data.cultivar) && GP.norm(x.rootstock) === GP.norm(data.rootstock) &&
+          (same(x.name_la, data.name_la) || (!data.name_la && same(x.name_cs, data.name_cs)) || (!data.name_la && !data.name_cs && same(x.name_sk, data.name_sk))));
       if (p && thisRun.has(p.id)) {
         res.dupes++; // the same plant again in this file = another specimen
       } else if (p) {

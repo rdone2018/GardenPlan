@@ -47,7 +47,8 @@
       const f = GP.PLANT_FIELDS.find(x => 'plant:' + x.key === base);
       return f && f.type === 'care' ? base + '.months' : '';
     }
-    const candidates = [];
+    // "Původní název" = the plant's current Czech name, used to find it when the file renames it
+    const candidates = [['match:name', ['puvodni nazev', 'povodny nazov', 'original name']]];
     for (const f of GP.PLANT_FIELDS) candidates.push(['plant:' + f.key, [GP.norm(f.cs), GP.norm(f.en), ...f.aliases]]);
     for (const f of GP.PLACEMENT_FIELDS) candidates.push(['place:' + f.key, [GP.norm(f.cs), GP.norm(f.en), ...f.aliases]]);
     for (const [target, names] of candidates) if (names.includes(h)) return target;

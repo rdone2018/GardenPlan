@@ -202,8 +202,8 @@
 
     F('light', 2, 'multi', 'Světlo', 'Light', ['svetlo', 'light', 'stanoviste', 'expozice', 'slnko', 'sun'], { core: true, sub: 'needs', opts: O.light }),
     F('water', 2, 'multi', 'Voda', 'Water', ['voda', 'vlhkost', 'water', 'moisture', 'naroky na vodu', 'odolnost suchu'], { core: true, sub: 'needs', opts: O.water, half: true, span: 2 }),
-    F('soilType', 2, 'select', 'Typ', 'Type', ['puda', 'typ pudy', 'soil', 'soil type'], { sub: 'needs', box: 'soil', opts: O.soilType }),
-    F('soilPh', 2, 'select', 'pH', 'pH', ['ph', 'ph pudy', 'soil ph'], { core: true, sub: 'needs', box: 'soil', opts: O.soilPh }),
+    F('soilType', 2, 'select', 'Typ půdy', 'Soil type', ['puda', 'typ pudy', 'soil', 'soil type'], { sub: 'needs', box: 'soil', opts: O.soilType }),
+    F('soilPh', 2, 'select', 'pH půdy', 'Soil pH', ['ph', 'ph pudy', 'soil ph'], { core: true, sub: 'needs', box: 'soil', opts: O.soilPh }),
     F('hardiness', 2, 'num', 'Mrazuvzdornost (°C)', 'Frost hardiness (°C)', ['mrazuvzdornost', 'mrazuvzdornost (°c)', 'mrazuvzdornost (c)', 'hardiness', 'odolnost'], { core: true, sub: 'needs', box: 'frost', hint: 'např. -25' }),
     F('usda', 2, 'select', 'Zóna USDA', 'USDA zone', ['usda', 'zona', 'zona odolnosti', 'zone', 'hardiness zone'], { sub: 'needs', box: 'frost', opts: O.usda }),
     F('companions', 2, 'longtext', 'Vhodní sousedé', 'Good neighbours', ['vhodni sousede', 'susedia', 'companions', 'good neighbours'], { sub: 'needs' }),
@@ -273,6 +273,7 @@
     cultivar: true, rootstock: true, link: true, synonyms: true, notes: true, otherCare: true,
     pollinators: p => !['cross', 'partial'].includes(p.pollination),
     crop: p => p.purpose === 'ornamental',
+    pollination: p => p.purpose === 'ornamental',
     flowerShowy: p => p.leafType === 'conifer', flowerColors: p => p.leafType === 'conifer',
     bloomMonths: p => p.leafType === 'conifer', scent: p => p.leafType === 'conifer',
     autumnColors: p => p.foliage === 'evergreen' || p.leafType === 'conifer',
