@@ -35,7 +35,8 @@
       const all = GP.state.plants, list = filtered();
       const opt = (v, label, cur) => '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(label) + '</option>';
       const head = '<div class="head"><h1>' + L('Rostliny', 'Plants') + ' <span class="muted">(' + all.length + ')</span></h1>' +
-        '<div class="row gap"><a class="btn" href="#/import">⬆ ' + L('Import CSV', 'Import CSV') + '</a><button class="btn" data-act="export">⬇ ' + L('Export CSV', 'Export CSV') + '</button>' +
+        '<div class="row gap">' + (all.length ? '<button class="btn" data-act="bulk" title="' + L('Pro rostliny ve výběru bez latinského názvu', 'For plants in the list without a Latin name') + '">🔎 ' + L('Doplnit z databází', 'Fill from databases') + '</button>' : '') +
+        '<a class="btn" href="#/import">⬆ ' + L('Import CSV', 'Import CSV') + '</a><button class="btn" data-act="export">⬇ ' + L('Export CSV', 'Export CSV') + '</button>' +
         '<button class="btn primary" data-act="new">+ ' + L('Nová rostlina', 'New plant') + '</button></div></div>';
       if (!all.length) {
         return head + '<div class="empty"><p>' + L('Katalog je prázdný. Importujte svůj seznam z Excelu (uložit jako CSV), nebo přidejte rostlinu ručně. Stačí název – zbytek doplníme postupně.', 'The catalog is empty. Import your list from Excel (save as CSV), or add a plant by hand. A name is enough – the rest can be filled in over time.') + '</p>' +
@@ -68,6 +69,12 @@
     mount(root) {
       const nb = root.querySelector('[data-act=new]');
       nb.onclick = () => { const p = GP.newPlant(); GP.go('plant/' + p.id); };
+      const bulk = root.querySelector('[data-act=bulk]');
+      if (bulk) bulk.onclick = () => {
+        const todo = filtered().filter(p => !p.name_la);
+        if (!todo.length) return GP.ui.toast(L('Všechny rostliny ve výběru už mají latinský název – doplňte je jednotlivě na kartě.', 'All plants in the list already have a Latin name – use the plant card.'));
+        GP.lookup.bulk(todo, () => GP.render());
+      };
       const ex = root.querySelector('[data-act=export]');
       if (ex) ex.onclick = () => GP.ui.download('rostliny-' + new Date().toISOString().slice(0, 10) + '.csv', GP.csv.exportPlants(), 'text/csv;charset=utf-8');
       root.querySelectorAll('[data-f]').forEach(el => {
@@ -108,11 +115,13 @@
       // Lines in the notes starting with "!!!" are shown as a warning at the top.
       const important = (p.notes || '').split('\n').filter(x => /^\s*!!!/.test(x)).map(x => x.replace(/^\s*!!!\s*/, ''));
       let html = '<div class="head"><h1><a href="#/plants" class="back">←</a> <span id="pname">' + esc(GP.plantName(p)) + '</span></h1>' +
-        '<div class="row gap"><span id="pbar">' + GP.ui.bar(pct) + '</span><button class="btn primary" data-act="save">💾 ' + L('Uložit', 'Save') + '</button>' +
+        '<div class="row gap"><span id="pbar">' + GP.ui.bar(pct) + '</span><button class="btn" data-act="lookup">🔎 ' + L('Doplnit z databází', 'Fill from databases') + '</button>' +
+        '<button class="btn primary" data-act="save">💾 ' + L('Uložit', 'Save') + '</button>' +
         '<button class="btn danger" data-act="del">' + L('Smazat', 'Delete') + '</button></div></div>' +
         '<div class="plant-top"><div class="photo-box">' + (p.photo ? '<img src="' + p.photo + '" alt="">' : '<div class="ph">🌿</div>') +
         '<label class="btn small">📷 ' + (p.photo ? L('Změnit foto', 'Change photo') : L('Přidat foto', 'Add photo')) + '<input type="file" accept="image/*" data-act="photo" hidden></label>' +
-        (p.photo ? ' <button class="link small danger" data-act="nophoto">✕</button>' : '') + '</div>' +
+        (p.photo ? ' <button class="link small danger" data-act="nophoto">✕</button>' : '') +
+        (p.photo && p.photoCredit ? '<div class="credit">' + (p.photoPage ? '<a target="_blank" rel="noopener" href="' + esc(p.photoPage) + '">' + esc(p.photoCredit) + '</a>' : esc(p.photoCredit)) + '</div>' : '') + '</div>' +
         '<div class="grow"><p class="names"><b>CZ</b> ' + esc(p.name_cs || '—') + ' · <b>SK</b> ' + esc(p.name_sk || '—') + ' · <b>EN</b> ' + esc(p.name_en || '—') + ' · <b>LA</b> <i>' + esc(p.name_la || '—') + '</i></p>' +
         important.map(x => '<div class="alert">⚠ ' + esc(x) + '</div>').join('') +
         (missing.length ? '<p class="small muted">' + L('Chybí doplnit', 'Still missing') + ': ' + esc(missing.join(', ')) + '</p>' : '<p class="small ok-text">✓ ' + L('Hlavní údaje jsou kompletní', 'Main details are complete') + '</p>') +
@@ -159,6 +168,7 @@
       };
       const idn = root.querySelector('[data-k=idNote]');
       if (idn) idn.oninput = () => { p.idNote = idn.value; GP.save(); };
+      root.querySelector('[data-act=lookup]').onclick = () => GP.lookup.dialog(p, () => { GP.render(); GP.ui.toast(L('Doplněno ✓', 'Filled in ✓')); });
       root.querySelector('[data-act=save]').onclick = () => { GP.saveNow(); GP.ui.toast(L('Uloženo ✓', 'Saved ✓')); };
       root.querySelector('[data-act=del]').onclick = () => {
         if (!confirm(L('Smazat rostlinu „' + GP.plantName(p) + '“ z katalogu i ze všech zahrad?', 'Delete "' + GP.plantName(p) + '" from the catalog and all gardens?'))) return;
@@ -170,10 +180,11 @@
         const f = e.target.files[0];
         if (!f) return;
         p.photo = await GP.ui.readImage(f, 900);
+        delete p.photoCredit; delete p.photoPage;
         GP.saveNow(); GP.render();
       };
       const np = root.querySelector('[data-act=nophoto]');
-      if (np) np.onclick = () => { delete p.photo; GP.saveNow(); GP.render(); };
+      if (np) np.onclick = () => { delete p.photo; delete p.photoCredit; delete p.photoPage; GP.saveNow(); GP.render(); };
 
       const pp = root.querySelector('#plantings');
       pp.addEventListener('input', e => upd(e));

@@ -268,6 +268,17 @@ input.num { width: 4.5rem; }
 .history .tbl { font-size: .8rem; }
 .modal { position: fixed; inset: 0; background: rgba(20,30,18,.55); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; }
 .modal-box { background: #fff; border-radius: var(--radius); padding: 1rem; width: min(900px, 100%); display: flex; flex-direction: column; gap: .6rem; max-height: 100%; }
+.lookup { max-height: 90vh; overflow: auto; }
+.lk-scroll { max-height: 55vh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.lk-bulk select { max-width: 100%; }
+.lk-bulk td { vertical-align: middle; }
+.lk-cands { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .3rem; }
+.lk-cand { width: 100%; text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: .5rem .7rem; cursor: pointer; }
+.lk-cand:hover { border-color: var(--green-2); background: #f4f8ef; }
+.lk-table img { max-width: 160px; max-height: 120px; border-radius: 6px; display: block; }
+.lk-table td { vertical-align: top; }
+.photo-box .credit { font-size: .7rem; color: var(--muted); max-width: 180px; overflow-wrap: anywhere; }
+.photo-box .credit a { color: inherit; }
 .modal .map { height: min(60vh, 520px); border-radius: 8px; border: 1px solid var(--line); }
 .search-res { max-height: 9rem; overflow: auto; font-size: .85rem; }
 .search-res .link { text-align: left; }
