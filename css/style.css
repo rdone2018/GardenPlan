@@ -211,8 +211,9 @@ details.group:not([open]) > summary h2::before { content: "▸ "; }
 .chip.on { background: var(--green-2); border-color: var(--green-2); color: #fff; }
 input.num { width: 4.5rem; }
 .water-row { display: grid; grid-template-columns: 1.3fr 1fr 1.3fr auto; gap: .4rem; margin-bottom: .4rem; align-items: center; }
-.sides { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem .8rem; margin-bottom: .4rem; }
-.side-sel { display: flex; flex-direction: column; gap: .1rem; }
+.sides { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; margin-bottom: .6rem; }
+.side-sel { display: flex; flex-direction: column; gap: .3rem; background: #faf9f5; border: 1px solid #eeebe1; border-radius: 8px; padding: .5rem; }
+.side-sel input.num { width: 3.6rem; }
 .field > .btn { align-self: flex-start; }
 .history { margin: .8rem 0; overflow-x: auto; }
 .history summary { cursor: pointer; font-weight: 600; margin-bottom: .4rem; }

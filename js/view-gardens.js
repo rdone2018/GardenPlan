@@ -79,7 +79,7 @@
       return '<div class="head"><h1>' + L('Zahrady', 'Gardens') + '</h1><button class="btn primary" data-act="new">+ ' + L('Nová zahrada', 'New garden') + '</button></div>' +
         (gs.length ? '<div class="cards">' + gs.map(g => {
           const n = GP.gardenPlacements(g.id).length;
-          return '<a class="card garden-card" href="#/garden/' + g.id + '/plan">' + miniMap(g) +
+          return '<a class="card garden-card" href="#/garden/' + g.id + '">' + miniMap(g) +
             '<h3>' + esc(g.name) + '</h3><p class="muted">' + esc([g.gardenType, g.address].filter(Boolean).join(' · ')) + '</p>' +
             '<p class="small">' + [g.area ? esc(g.area) + ' m²' : '', g.altitude ? esc(g.altitude) + ' m n. m.' : '', (g.soils || []).map(s => GP.optLabel(GP.SOILS, s)).join(', '), n + ' ' + L('rostlin', 'plants')].filter(Boolean).join(' · ') + '</p></a>';
         }).join('') + '</div>'
@@ -104,13 +104,15 @@
   }
 
   // ---------------- garden detail ----------------
-  const TABS = [['plan', '🗺️', 'Plán', 'Plan'], ['list', '🌱', 'Rostliny', 'Plants'], ['info', '📋', 'Údaje', 'Details'], ['zones', '🎨', 'Zóny a mřížka', 'Zones & grid']];
+  // Order follows the set-up: basics -> plants -> zones & grid -> plan (built from all of them)
+  const TABS = [['info', '📋', 'Základní údaje', 'Basic details'], ['list', '🌱', 'Rostliny', 'Plants'], ['zones', '🎨', 'Zóny a mřížka', 'Zones & grid'], ['plan', '🗺️', 'Plán', 'Plan']];
+  const defaultTab = g => (GP.gardenPlacements(g.id).some(pl => pl.cells && pl.cells.length) ? 'plan' : 'info');
 
   GP.views.garden = {
     render([id, tab]) {
       const g = GP.byId('gardens', id);
       if (!g) return '<p>' + L('Zahrada nenalezena.', 'Garden not found.') + ' <a href="#/gardens">←</a></p>';
-      tab = tab || 'plan';
+      tab = tab || defaultTab(g);
       const tabs = '<div class="tabs">' + TABS.map(([t, i, cs, en]) => '<a href="#/garden/' + g.id + '/' + t + '" class="' + (t === tab ? 'on' : '') + '">' + i + ' ' + L(cs, en) + '</a>').join('') + '</div>';
       const body = tab === 'info' ? infoTab(g) : tab === 'zones' ? zonesTab(g) : tab === 'list' ? listTab(g) : planTab(g);
       return '<div class="head"><h1><a href="#/gardens" class="back">←</a> ' + esc(g.name) + '</h1></div>' + tabs + body;
@@ -118,7 +120,7 @@
     mount(root, [id, tab]) {
       const g = GP.byId('gardens', id);
       if (!g) return;
-      tab = tab || 'plan';
+      tab = tab || defaultTab(g);
       if (tab === 'info') mountInfo(root, g);
       else if (tab === 'zones') mountZones(root, g);
       else if (tab === 'list') mountList(root, g);
@@ -138,6 +140,45 @@
     g.soils = g.soils || [];
     g.water = g.water || [];
     g.surround = g.surround || {};
+    g.surroundH = g.surroundH || {};
+    g.surroundD = g.surroundD || {};
+    for (const k in g.surround) if (g.surround[k] === 'trees') g.surround[k] = 'selfsown';
+    if (g.soilPh && !GP.SOIL_PH.some(o => o[0] === g.soilPh)) { g.soilPhValue = g.soilPh; g.soilPh = GP.phCategory(g.soilPh); }
+  }
+
+  // "JV + 2–7°" -> human sentence
+  function slopeText(g) {
+    const dir = { N: L('k severu', 'to the north'), NE: L('k severovýchodu', 'to the north-east'), E: L('k východu', 'to the east'), SE: L('k jihovýchodu', 'to the south-east'),
+      S: L('k jihu', 'to the south'), SW: L('k jihozápadu', 'to the south-west'), W: L('k západu', 'to the west'), NW: L('k severozápadu', 'to the north-west') }[g.aspect];
+    if (g.aspect === 'flat' || g.slope === '0') {
+      return L('Pozemek je prakticky rovný', 'The plot is practically flat') + (dir ? ' (' + L('jen nepatrně klesá ', 'only very slightly falling ') + dir + ')' : '') +
+        ' – ' + L('orientace na slunce téměř nehraje roli.', 'aspect hardly matters for sun.');
+    }
+    if (!dir || !g.slope) return '';
+    const how = { 1: L('mírně', 'gently'), 2: L('středně', 'moderately'), 3: L('prudce', 'steeply'), 4: L('velmi prudce', 'very steeply') }[g.slope];
+    const effect = /S/.test(g.aspect) && !/N/.test(g.aspect) ? L('teplejší, slunné stanoviště, dříve na jaře rozmrzá, rychleji vysychá.', 'warmer and sunnier, thaws earlier in spring, dries faster.')
+      : /N/.test(g.aspect) && !/S/.test(g.aspect) ? L('chladnější a stinnější, později rozmrzá, déle drží vlhkost.', 'cooler and shadier, thaws later, stays moist longer.')
+        : g.aspect === 'E' ? L('ranní slunce, chráněno před odpoledním žárem.', 'morning sun, sheltered from afternoon heat.') : L('odpolední slunce, teplejší a sušší.', 'afternoon sun, warmer and drier.');
+    return L('Pozemek ', 'The plot falls ') + how + ' ' + L('klesá ', '') + dir + ' – ' + effect;
+  }
+
+  // Rough length of the shadow an obstacle on side `k` throws into the garden.
+  function shadeText(g, k) {
+    const h = num(g.surroundH[k]);
+    if (!(h > 0)) return '';
+    const d = num(g.surroundD[k]) > 0 ? num(g.surroundD[k]) : 0;
+    const lat = isNaN(num(g.lat)) ? 50 : num(g.lat);
+    const reach = elev => Math.max(0, h / Math.tan(elev * Math.PI / 180) - d);
+    const m = x => (x < 0.5 ? '0' : x < 10 ? x.toFixed(1).replace('.', L(',', '.')) : Math.round(x)) + ' m';
+    if (k === 'S') {
+      return '☀ ' + L('polední stín do zahrady', 'noon shadow into the garden') + ': ' + L('červen', 'June') + ' ' + m(reach(90 - lat + 23.44)) + ', ' +
+        L('březen/září', 'Mar/Sep') + ' ' + m(reach(90 - lat)) + ', ' + L('prosinec', 'December') + ' ' + m(reach(90 - lat - 23.44));
+    }
+    if (k === 'E' || k === 'W') {
+      return '☀ ' + (k === 'E' ? L('stíní ráno a dopoledne', 'shades in the morning') : L('stíní odpoledne a večer', 'shades in the afternoon and evening')) +
+        ' – ' + L('při slunci 30° nad obzorem dosáhne stín', 'with the sun 30° high the shadow reaches') + ' ~' + m(reach(30));
+    }
+    return '☀ ' + L('ze severu stín do zahrady téměř nepadá (jen v létě brzy ráno a večer).', 'from the north hardly any shadow falls into the garden (only early and late in summer).');
   }
 
   const selectHtml = (list, value, attrs) => '<select ' + attrs + '>' + list.map(o => '<option value="' + o[0] + '"' + (o[0] === (value || '') ? ' selected' : '') + '>' + esc(L(o[1], o[2])) + '</option>').join('') + '</select>';
@@ -155,18 +196,25 @@
       '<div class="field"><span class="lbl">' + L('Orientace a svah', 'Aspect and slope') + '</span><div class="row gap">' +
       selectHtml(GP.ASPECTS, g.aspect, 'data-k="aspect" title="' + L('Kam je svah natočený', 'Which way the slope faces') + '"') +
       selectHtml(GP.SLOPES, g.slope, 'data-k="slope" title="' + L('Sklon', 'Slope') + '"') + '</div>' +
+      '<p class="small muted" id="slopeText">' + esc(slopeText(g)) + '</p>' +
       (g.aspectNote ? '<input type="text" data-k="aspectNote" value="' + esc(g.aspectNote) + '">' : '') + '</div>' +
       '<div class="field"><span class="lbl">' + L('Typ půdy (lze vybrat více)', 'Soil type (several allowed)') + '</span><div class="chips" data-chips="soils">' +
       GP.SOILS.map(s => '<button type="button" class="chip' + (g.soils.includes(s[0]) ? ' on' : '') + '" data-v="' + s[0] + '">' + esc(L(s[1], s[2])) + '</button>').join('') + '</div>' +
-      '<div class="row gap"><input type="text" data-k="soilNote" value="' + esc(g.soilNote) + '" placeholder="' + L('poznámka k půdě (kde je jaká…)', 'soil note (where is which…)') + '">' +
-      '<label class="row small">pH <input type="text" class="num" data-k="soilPh" value="' + esc(g.soilPh) + '"></label></div></div>' +
+      '<input type="text" data-k="soilNote" value="' + esc(g.soilNote) + '" placeholder="' + L('poznámka k půdě (kde je jaká…)', 'soil note (where is which…)') + '"></div>' +
+      '<div class="field"><span class="lbl">' + L('Půdní reakce (pH)', 'Soil reaction (pH)') + '</span><div class="row gap">' +
+      selectHtml(GP.SOIL_PH, g.soilPh, 'data-k="soilPh" id="phSel"') +
+      '<label class="row small">' + L('naměřeno', 'measured') + ' <input type="text" inputmode="decimal" class="num" data-k="soilPhValue" value="' + esc(g.soilPhValue) + '" placeholder="6,5"></label></div></div>' +
       '<div class="field"><span class="lbl">' + L('Zdroje vody', 'Water sources') + '</span><div id="water">' +
       g.water.map((w, i) => '<div class="water-row" data-w="' + i + '">' + selectHtml(GP.WATER_SOURCES, w.type, 'data-wk="type"') +
         '<input type="text" data-wk="capacity" value="' + esc(w.capacity) + '" placeholder="' + L('kapacita, např. 10 m³', 'capacity, e.g. 10 m³') + '">' +
         '<input type="text" data-wk="note" value="' + esc(w.note) + '" placeholder="' + L('poznámka', 'note') + '"><button class="link danger" data-delw="' + i + '">✕</button></div>').join('') +
       '</div><button class="btn small" data-act="addwater">+ ' + L('Přidat zdroj vody', 'Add water source') + '</button></div>' +
       '<div class="field"><span class="lbl">' + L('Okolí zahrady', 'Surroundings') + '</span><div class="sides">' +
-      GP.SIDES.map(([k, cs, en]) => '<label class="side-sel"><span class="small">' + esc(L(cs, en)) + '</span>' + selectHtml(GP.SURROUND, g.surround[k], 'data-k="surround.' + k + '"') + '</label>').join('') + '</div>' +
+      GP.SIDES.map(([k, cs, en]) => '<div class="side-sel"><span class="small"><b>' + esc(L(cs, en)) + '</b></span>' + selectHtml(GP.SURROUND, g.surround[k], 'data-k="surround.' + k + '"') +
+        '<div class="row gap small"><label class="row">' + L('výška', 'height') + ' <input type="text" inputmode="decimal" class="num" data-k="surroundH.' + k + '" value="' + esc(g.surroundH[k]) + '"> m</label>' +
+        '<label class="row" title="' + L('Vzdálenost překážky od hranice zahrady', 'Distance of the obstacle from the garden boundary') + '">' + L('od hranice', 'from edge') +
+        ' <input type="text" inputmode="decimal" class="num" data-k="surroundD.' + k + '" value="' + esc(g.surroundD[k]) + '"> m</label></div>' +
+        '<div class="small warn-text" id="shade-' + k + '">' + esc(shadeText(g, k)) + '</div></div>').join('') + '</div>' +
       '<textarea data-k="surroundings" rows="2" placeholder="' + L('podrobnosti: výška stromů, stín, vítr…', 'details: tree height, shade, wind…') + '">' + esc(g.surroundings) + '</textarea></div>' +
       GP.ui.field({ key: 'notes', type: 'longtext', cs: 'Poznámky', en: 'Notes' }, g.notes) + '</div></div>';
 
@@ -197,6 +245,13 @@
         g.area = a ? String(a) : '';
         root.querySelector('#areaOut').textContent = a ? a.toLocaleString(L('cs-CZ', 'en-GB')) + ' m²' : '—';
       }
+      if (key === 'aspect' || key === 'slope') root.querySelector('#slopeText').textContent = slopeText(g);
+      if (key === 'soilPhValue' && GP.phCategory(g.soilPhValue)) {
+        g.soilPh = GP.phCategory(g.soilPhValue);
+        root.querySelector('#phSel').value = g.soilPh;
+      }
+      const side = /^surround[HD]?\.(\w+)$/.exec(key);
+      if (side) root.querySelector('#shade-' + side[1]).textContent = shadeText(g, side[1]);
     });
     GP.ui.bind(root.querySelector('#gsite'), g, key => {
       if (key === 'lat' || key === 'lon') root.querySelector('[data-act=fetch]').disabled = isNaN(num(g.lat)) || isNaN(num(g.lon));

@@ -243,12 +243,22 @@
     ['3', 'prudký (15–30°)', 'steep (15–30°)'], ['4', 'velmi prudký (nad 30°)', 'very steep (over 30°)']];
   GP.SOILS = [['sand', 'písčitá', 'sandy'], ['loamysand', 'hlinitopísčitá', 'loamy sand'], ['sandyloam', 'písčitohlinitá', 'sandy loam'], ['loam', 'hlinitá', 'loam'],
     ['clayloam', 'jílovitohlinitá', 'clay loam'], ['clay', 'jílovitá', 'clay'], ['stony', 'kamenitá', 'stony'], ['peat', 'rašelinná', 'peaty'], ['fill', 'navážka', 'made ground']];
+  GP.SOIL_PH = [['', '—', '—'], ['vacid', 'silně kyselá (pH pod 5,0)', 'strongly acidic (pH below 5.0)'], ['acid', 'kyselá (pH 5,0–5,5)', 'acidic (pH 5.0–5.5)'],
+    ['macid', 'mírně kyselá (pH 5,5–6,5)', 'slightly acidic (pH 5.5–6.5)'], ['neutral', 'neutrální (pH 6,5–7,2)', 'neutral (pH 6.5–7.2)'],
+    ['malk', 'mírně zásaditá (pH 7,2–7,8)', 'slightly alkaline (pH 7.2–7.8)'], ['alk', 'zásaditá (pH 7,8–8,5)', 'alkaline (pH 7.8–8.5)'],
+    ['valk', 'silně zásaditá (pH nad 8,5)', 'strongly alkaline (pH above 8.5)']];
+  // measured pH value -> category key
+  GP.phCategory = v => {
+    const x = parseFloat(String(v).replace(',', '.'));
+    if (isNaN(x)) return '';
+    return x < 5 ? 'vacid' : x < 5.5 ? 'acid' : x < 6.5 ? 'macid' : x <= 7.2 ? 'neutral' : x <= 7.8 ? 'malk' : x <= 8.5 ? 'alk' : 'valk';
+  };
   GP.WATER_SOURCES = [['mains', 'vodovod', 'mains water'], ['well', 'studna', 'well'], ['tank', 'retenční nádrž (dešťovka)', 'rainwater tank'], ['barrel', 'sud na dešťovku', 'water butt'],
     ['stream', 'potok / rybník', 'stream / pond'], ['grey', 'šedá voda', 'grey water'], ['other', 'jiný', 'other']];
   GP.SIDES = [['N', 'Na severu', 'To the north'], ['E', 'Na východě', 'To the east'], ['S', 'Na jihu', 'To the south'], ['W', 'Na západě', 'To the west']];
   GP.SURROUND = [['', '—', '—'], ['garden', 'zahrada souseda', 'neighbour’s garden'], ['house', 'dům / budova', 'house / building'], ['street', 'ulice / silnice', 'street / road'],
     ['broadleaf', 'listnatý les', 'broadleaf forest'], ['conifer', 'jehličnatý les', 'coniferous forest'], ['mixed', 'smíšený les', 'mixed forest'],
-    ['trees', 'vzrostlé stromy', 'tall trees'], ['field', 'pole', 'field'], ['meadow', 'louka / pastva', 'meadow / pasture'], ['orchard', 'sad', 'orchard'],
+    ['selfsown', 'nálety (samovolně vzrostlé dřeviny)', 'self-sown trees / scrub'], ['field', 'pole', 'field'], ['meadow', 'louka / pastva', 'meadow / pasture'], ['orchard', 'sad', 'orchard'],
     ['water', 'vodní plocha / potok', 'water / stream'], ['wall', 'plot / zeď', 'fence / wall'], ['hedge', 'živý plot', 'hedge'], ['open', 'otevřená krajina', 'open land'], ['other', 'jiné', 'other']];
 
   GP.EQUIP_KINDS = [['watering', 'Zavlažování', 'Watering'], ['mowing', 'Sekání', 'Mowing'], ['lighting', 'Osvětlení', 'Lighting'],
