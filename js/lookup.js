@@ -272,8 +272,8 @@
     let stop = false, running = false;
     box.innerHTML = '<div class="modal-box lookup wide"><div class="row gap"><b class="grow">🔎 ' + L('Doplnit z databází', 'Fill from databases') + ' – ' + plants.length + ' ' + L('rostlin', 'plants') + '</b>' +
       '<button class="link" data-x>✕</button></div>' +
-      '<p class="small muted">' + L('Ke každé rostlině najdu druh na Wikidatech a v GBIF. Zkontrolujte ho (u nejistých vyberte jiný nebo „nepoužít“) a dejte Použít. Doplní se jen prázdná pole: latinský a další názvy, odrůda ze zbytku názvu, rod, čeleď, synonyma a fotka.',
-        'For each plant I look up the species on Wikidata and GBIF. Check it (pick another or "skip") and press Apply. Only empty fields are filled: Latin and other names, cultivar from the rest of the name, genus, family, synonyms and photo.') + '</p>' +
+      '<p class="small muted">' + L('Ke každé rostlině najdu druh na Wikidatech a v GBIF. Zkontrolujte ho (u nejistých vyberte jiný nebo „nepoužít“) a dejte Použít. Doplní se jen prázdná pole: latinský a další názvy, odrůda ze zbytku názvu, rod, čeleď, synonyma a fotka. U rostlin s latinským názvem se hledá podle něj.',
+        'For each plant I look up the species on Wikidata and GBIF. Check it (pick another or "skip") and press Apply. Only empty fields are filled: Latin and other names, cultivar from the rest of the name, genus, family, synonyms and photo. Plants with a Latin name are looked up by it.') + '</p>' +
       '<label class="small"><input type="checkbox" data-photos checked> ' + L('stáhnout i fotky (z Wikimedia Commons)', 'also download photos (from Wikimedia Commons)') + '</label>' +
       '<div class="lk-progress small muted"></div><div class="lk-scroll"><table class="tbl lk-bulk"><thead><tr><th>' + L('Rostlina', 'Plant') + '</th><th>' + L('Nalezený druh', 'Species found') + '</th><th>' + L('Odrůda', 'Cultivar') + '</th></tr></thead><tbody></tbody></table></div>' +
       '<div class="row gap"><button class="btn primary" data-apply disabled>' + L('Použít', 'Apply') + '</button><button class="btn" data-stop>' + L('Zastavit hledání', 'Stop searching') + '</button></div></div>';

@@ -47,7 +47,7 @@
       const all = GP.state.plants, list = filtered();
       const opt = (v, label, cur) => '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(label) + '</option>';
       const head = '<div class="head"><h1>' + L('Rostliny', 'Plants') + ' <span class="muted">(' + all.length + ')</span></h1>' +
-        '<div class="row gap">' + (all.length ? '<button class="btn" data-act="bulk" title="' + L('Pro rostliny ve výběru bez latinského názvu', 'For plants in the list without a Latin name') + '">🔎 ' + L('Doplnit z databází', 'Fill from databases') + '</button>' : '') +
+        '<div class="row gap">' + (all.length ? '<button class="btn" data-act="bulk" title="' + L('Pro rostliny ve výběru bez latinského názvu nebo bez fotky', 'For plants in the list without a Latin name or photo') + '">🔎 ' + L('Doplnit z databází', 'Fill from databases') + '</button>' : '') +
         '<a class="btn" href="#/import">⬆ ' + L('Import CSV', 'Import CSV') + '</a><button class="btn" data-act="export">⬇ ' + L('Export CSV', 'Export CSV') + '</button>' +
         '<button class="btn primary" data-act="new">+ ' + L('Nová rostlina', 'New plant') + '</button></div></div>';
       if (!all.length) {
@@ -85,8 +85,9 @@
       nb.onclick = () => { const p = GP.newPlant(); GP.go('plant/' + p.id); };
       const bulk = root.querySelector('[data-act=bulk]');
       if (bulk) bulk.onclick = () => {
-        const todo = filtered().filter(p => !p.name_la);
-        if (!todo.length) return GP.ui.toast(L('Všechny rostliny ve výběru už mají latinský název – doplňte je jednotlivě na kartě.', 'All plants in the list already have a Latin name – use the plant card.'));
+        // plants still missing the Latin name or a photo
+        const todo = filtered().filter(p => !p.name_la || !p.photo);
+        if (!todo.length) return GP.ui.toast(L('Všechny rostliny ve výběru už mají latinský název i fotku – další údaje doplňte na kartě.', 'All plants in the list already have a Latin name and a photo – use the plant card.'));
         GP.lookup.bulk(todo, () => GP.render());
       };
       const ex = root.querySelector('[data-act=export]');
