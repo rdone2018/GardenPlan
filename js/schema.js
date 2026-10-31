@@ -265,8 +265,36 @@
   GP.careExpected = (plant, f) => !!(f.maint && (plant.maintenance || []).includes(f.maint));
   GP.coreFields = plant => GP.PLANT_FIELDS.filter(f => f.core || (f.type === 'care' && GP.careExpected(plant, f)));
   GP.completeness = function (plant) {
-    const core = GP.coreFields(plant);
-    return Math.round(100 * core.filter(f => GP.isFilled(plant, f)).length / core.length);
+    const fs = GP.countedFields(plant);
+    return Math.round(100 * fs.filter(f => GP.isFilled(plant, f)).length / fs.length);
+  };
+  // Fields that do not apply to every plant are not counted as missing (true = never counted, function = when it returns true).
+  const NOT_NEEDED = {
+    cultivar: true, rootstock: true, link: true, synonyms: true, notes: true, otherCare: true,
+    pollinators: p => !['cross', 'partial'].includes(p.pollination),
+    crop: p => p.purpose === 'ornamental',
+    flowerShowy: p => p.leafType === 'conifer', flowerColors: p => p.leafType === 'conifer',
+    bloomMonths: p => p.leafType === 'conifer', scent: p => p.leafType === 'conifer',
+    autumnColors: p => p.foliage === 'evergreen' || p.leafType === 'conifer',
+    harvestMonths: p => p.fruit !== 'edible' && !p.crop,
+    depth: p => !sown(p) && p.type !== 'bulb'
+  };
+  // Everything the card shows for this plant that should be filled in (care: only the items ticked under maintenance).
+  GP.countedFields = plant => GP.PLANT_FIELDS.filter(f => {
+    if (f.show && !f.show(plant)) return false;
+    const nn = NOT_NEEDED[f.key];
+    if (nn === true || (typeof nn === 'function' && nn(plant))) return false;
+    return f.type !== 'care' || GP.careExpected(plant, f);
+  });
+  // Per section: { pct, missing: [labels] }; care is unknown (pct null) until "Needs maintenance" is ticked.
+  GP.groupCompleteness = function (plant) {
+    const counted = GP.countedFields(plant);
+    return GP.groups().map((g, gi) => {
+      const fs = counted.filter(f => f.group === gi);
+      if (gi === 3 && !(plant.maintenance || []).length) return { pct: null, missing: [] };
+      const missing = fs.filter(f => !GP.isFilled(plant, f)).map(GP.fieldLabel);
+      return { pct: fs.length ? Math.round(100 * (fs.length - missing.length) / fs.length) : 100, missing };
+    });
   };
 
   // ---------- reading free text into options ----------
