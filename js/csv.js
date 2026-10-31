@@ -77,6 +77,7 @@
         else if (f.type === 'months') out.push(GP.formatMonths(v || []));
         else if (f.type === 'bool') out.push(v === true ? 'ano' : v === false ? 'ne' : '');
         else if (f.type === 'select') out.push(GP.typeLabel(v));
+        else if (p.unsure && /^name_/.test(f.key) && v) out.push(v + ' ?'); // keeps "unidentified" on re-import
         else out.push(v || '');
       }
       lines.push(out.map(cell).join(';'));

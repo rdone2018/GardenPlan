@@ -16,7 +16,8 @@
       if (q && !GP.norm([p.name_cs, p.name_sk, p.name_en, p.name_la, p.cultivar, p.purpose].join(' ')).includes(q)) return false;
       if (filt.type && p.type !== filt.type) return false;
       if (filt.missing === '_any' && GP.completeness(p) === 100) return false;
-      if (filt.missing && filt.missing !== '_any' && GP.isFilled(p, GP.PLANT_FIELDS.find(f => f.key === filt.missing))) return false;
+      if (filt.missing === '_unsure' && !p.unsure) return false;
+      if (filt.missing && filt.missing[0] !== '_' &&GP.isFilled(p, GP.PLANT_FIELDS.find(f => f.key === filt.missing))) return false;
       if (filt.garden && !GP.state.placements.some(pl => pl.plantId === p.id && pl.gardenId === filt.garden && pl.status !== 'removed')) return false;
       return true;
     });
@@ -44,6 +45,7 @@
         '<select data-f="type">' + opt('', L('Všechny typy', 'All types'), filt.type) + GP.PLANT_TYPES.map(t => opt(t[0], L(t[1], t[2]), filt.type)).join('') + '</select>' +
         '<select data-f="garden">' + opt('', L('Všechny zahrady', 'All gardens'), filt.garden) + GP.state.gardens.map(g => opt(g.id, g.name, filt.garden)).join('') + '</select>' +
         '<select data-f="missing">' + opt('', L('Vše', 'All'), filt.missing) + opt('_any', L('Nekompletní', 'Incomplete'), filt.missing) +
+        opt('_unsure', L('Neurčené (?)', 'Unidentified (?)') + ' · ' + all.filter(p => p.unsure).length, filt.missing) +
         GP.PLANT_FIELDS.filter(f => f.core).map(f => opt(f.key, L('Chybí: ', 'Missing: ') + GP.fieldLabel(f), filt.missing)).join('') + '</select>' +
         '<select data-f="sort">' + opt('name', L('Řadit: název', 'Sort: name'), filt.sort) + opt('latin', L('Řadit: latinsky', 'Sort: Latin'), filt.sort) +
         opt('bloom', L('Řadit: doba květu', 'Sort: flowering'), filt.sort) + opt('complete', L('Řadit: vyplněnost', 'Sort: completeness'), filt.sort) + '</select></div>';
@@ -94,6 +96,14 @@
         ' <a target="_blank" rel="noopener" href="https://www.google.com/search?q=site%3Ahavlis.cz+' + search + '">Havlis</a>' +
         ' <a target="_blank" rel="noopener" href="https://www.rhs.org.uk/search?query=' + search + '">RHS</a></div>' : '';
 
+      // Unidentified plant: identification help instead of species care data.
+      const unsure = '<div class="unsure-box' + (p.unsure ? ' on' : '') + '"><label><input type="checkbox" data-act="unsure"' + (p.unsure ? ' checked' : '') + '> ' +
+        L('Přesný druh neznám (neurčená rostlina „?“)', 'Exact species unknown (unidentified plant "?")') + '</label>' +
+        (p.unsure ? '<p class="small">' + L('Údaje o péči z webu zatím nejde dohledat. Vyfoťte list, květ a celou rostlinu a zkuste ji určit:', 'Care data cannot be looked up yet. Photograph a leaf, the flower and the whole plant and try to identify it:') +
+          ' <a target="_blank" rel="noopener" href="https://identify.plantnet.org/">Pl@ntNet</a> · <a target="_blank" rel="noopener" href="https://lens.google.com/">Google Lens</a>. ' +
+          L('Až druh zjistíte, doplňte latinský název a zrušte zaškrtnutí.', 'Once you know the species, fill in the Latin name and untick this.') + '</p>' +
+          '<label class="field wide"><span class="lbl">' + L('Co o ní víme (vzhled, výška, kdy kvete, odkud je)', 'What we know (looks, height, flowering, where from)') + '</span>' +
+          '<textarea data-k="idNote" rows="2">' + esc(p.idNote || '') + '</textarea></label>' : '') + '</div>';
       const missing = GP.PLANT_FIELDS.filter(f => f.core && !GP.isFilled(p, f)).map(GP.fieldLabel);
       let html = '<div class="head"><h1><a href="#/plants" class="back">←</a> <span id="pname">' + esc(GP.plantName(p)) + '</span></h1>' +
         '<div class="row gap"><span id="pbar">' + GP.ui.bar(pct) + '</span><button class="btn primary" data-act="save">💾 ' + L('Uložit', 'Save') + '</button>' +
@@ -104,7 +114,7 @@
         '<div class="grow"><p class="names"><b>CZ</b> ' + esc(p.name_cs || '—') + ' · <b>SK</b> ' + esc(p.name_sk || '—') + ' · <b>EN</b> ' + esc(p.name_en || '—') + ' · <b>LA</b> <i>' + esc(p.name_la || '—') + '</i></p>' +
         (p.warning ? '<div class="alert">⚠ ' + esc(p.warning) + '</div>' : '') +
         (missing.length ? '<p class="small muted">' + L('Chybí doplnit', 'Still missing') + ': ' + esc(missing.join(', ')) + '</p>' : '<p class="small ok-text">✓ ' + L('Hlavní údaje jsou kompletní', 'Main details are complete') + '</p>') +
-        web + '</div></div><div id="pform">';
+        (p.unsure ? '' : web) + unsure + '</div></div><div id="pform">';
       for (let gi = 0; gi < 3; gi++) {
         html += '<details class="panel group" open><summary><h2>' + esc(groups[gi][0]) + '</h2><span class="muted small">' + esc(groups[gi][1]) + '</span></summary><div class="form">' +
           GP.PLANT_FIELDS.filter(f => f.group === gi).map(f => GP.ui.field(f, p[f.key])).join('') + '</div></details>';
@@ -119,6 +129,12 @@
         if (/^name_|^cultivar/.test(key)) root.querySelector('#pname').textContent = GP.plantName(p);
         root.querySelector('#pbar').innerHTML = GP.ui.bar(GP.completeness(p));
       });
+      root.querySelector('[data-act=unsure]').onchange = e => {
+        if (e.target.checked) p.unsure = true; else delete p.unsure;
+        GP.saveNow(); GP.render();
+      };
+      const idn = root.querySelector('[data-k=idNote]');
+      if (idn) idn.oninput = () => { p.idNote = idn.value; GP.save(); };
       root.querySelector('[data-act=save]').onclick = () => { GP.saveNow(); GP.ui.toast(L('Uloženo ✓', 'Saved ✓')); };
       root.querySelector('[data-act=del]').onclick = () => {
         if (!confirm(L('Smazat rostlinu „' + GP.plantName(p) + '“ z katalogu i ze všech zahrad?', 'Delete "' + GP.plantName(p) + '" from the catalog and all gardens?'))) return;

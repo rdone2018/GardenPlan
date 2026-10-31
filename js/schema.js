@@ -185,6 +185,8 @@
     let name = '';
     for (const k of order) if (p[k] && p[k].trim()) { name = p[k].trim(); break; }
     if (p.cultivar && !GP.norm(name).includes(GP.norm(p.cultivar))) name += " '" + p.cultivar.replace(/^['‘’"]|['‘’"]$/g, '') + "'";
+    // Unidentified plant (the exact species is not known yet) – marked with "?" everywhere.
+    if (p.unsure) name = (name || L('(bez názvu)', '(unnamed)')) + ' ?';
     return name || L('(bez názvu)', '(unnamed)');
   };
 
