@@ -215,7 +215,21 @@ input.num { width: 4.5rem; }
 .sides { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; margin-bottom: .6rem; }
 .side-sel { display: flex; flex-direction: column; gap: .3rem; background: #faf9f5; border: 1px solid #eeebe1; border-radius: 8px; padding: .5rem; }
 .side-sel input.num { width: 3.6rem; }
-.field > .btn { align-self: flex-start; }
+.field > .btn, .field > .link.left { align-self: flex-start; text-align: left; padding-left: 0; }
+.group { background: #faf9f5; border: 1px solid #eeebe1; border-radius: 8px; padding: .7rem .8rem; margin: .8rem 0; display: flex; flex-direction: column; gap: .7rem; }
+.group > h3 { margin: 0; font-size: .95rem; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem 1rem; align-items: start; }
+.pair.rain { grid-template-columns: 1fr 2fr; }
+.pair .dims { flex-wrap: nowrap; gap: .3rem; }
+.pair .dims input { width: 4.5rem; }
+.rain-chart { width: 100%; height: auto; display: block; }
+.rain-chart .baseline { stroke: #cfcabb; stroke-width: 1; }
+.rain-chart path { fill: #4d7fd6; }
+.rain-chart .hit { fill: transparent; }
+.rain-chart text { font-size: 9px; text-anchor: middle; fill: var(--muted); }
+.rain-chart .val { fill: var(--ink); font-weight: 600; opacity: 0; }
+.rain-chart .rb.max .val, .rain-chart .rb:hover .val { opacity: 1; }
+.rain-chart .rb:hover path { fill: #2f5fb3; }
 .history { margin: .8rem 0; overflow-x: auto; }
 .history summary { cursor: pointer; font-weight: 600; margin-bottom: .4rem; }
 .history .tbl { font-size: .8rem; }
@@ -245,6 +259,7 @@ input.num { width: 4.5rem; }
   .hide-sm { display: none; }
   .plant-top { flex-direction: column; }
   .form { grid-template-columns: 1fr; }
+  .pair.rain { grid-template-columns: 1fr; }
   .etask { grid-template-columns: 1fr; }
   .water-row { grid-template-columns: 1fr auto; }
   .water-row input { grid-column: 1; }

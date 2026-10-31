@@ -230,12 +230,13 @@
   GP.GARDEN_SITE = [
     { key: 'address', type: 'text', cs: 'Adresa', en: 'Address' },
     { key: 'altitude', type: 'text', cs: 'Nadmořská výška (m)', en: 'Altitude (m)' },
-    { key: 'minTemp', type: 'text', cs: 'Nejnižší zimní teplota (°C, průměr 5 let)', en: 'Lowest winter temperature (°C, 5-year avg)' },
-    { key: 'lastFrost', type: 'text', cs: 'Poslední jarní mrazy (průměr)', en: 'Last spring frost (avg)' },
-    { key: 'firstFrost', type: 'text', cs: 'První podzimní mrazy (průměr)', en: 'First autumn frost (avg)' },
+    { key: 'minTemp', type: 'text', cs: 'Nejnižší zimní (°C)', en: 'Lowest in winter (°C)' },
+    { key: 'maxTemp', type: 'text', cs: 'Nejvyšší letní (°C)', en: 'Highest in summer (°C)' },
+    { key: 'meanTemp', type: 'text', cs: 'Průměrná roční (°C)', en: 'Mean annual (°C)' },
     { key: 'frostFree', type: 'text', cs: 'Bezmrazé období (dní)', en: 'Frost-free period (days)' },
-    { key: 'rainfall', type: 'text', cs: 'Roční srážky (mm, průměr)', en: 'Annual rainfall (mm, avg)' },
-    { key: 'meanTemp', type: 'text', cs: 'Průměrná roční teplota (°C)', en: 'Mean annual temperature (°C)' }
+    { key: 'lastFrost', type: 'text', cs: 'Poslední jarní mrazy', en: 'Last spring frost' },
+    { key: 'firstFrost', type: 'text', cs: 'První podzimní mrazy', en: 'First autumn frost' },
+    { key: 'rainfall', type: 'text', cs: 'Roční srážky (mm)', en: 'Annual rainfall (mm)' }
   ];
   GP.ASPECTS = [['', '—', '—'], ['flat', 'rovina', 'flat'], ['N', 'sever (S)', 'north (N)'], ['NE', 'severovýchod (SV)', 'north-east (NE)'], ['E', 'východ (V)', 'east (E)'],
     ['SE', 'jihovýchod (JV)', 'south-east (SE)'], ['S', 'jih (J)', 'south (S)'], ['SW', 'jihozápad (JZ)', 'south-west (SW)'], ['W', 'západ (Z)', 'west (W)'], ['NW', 'severozápad (SZ)', 'north-west (NW)']];

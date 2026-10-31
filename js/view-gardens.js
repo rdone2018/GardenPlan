@@ -194,19 +194,23 @@
   function infoTab(g) {
     migrateGarden(g);
     const area = areaOf(g);
+    const group = (title, body) => '<section class="group"><h3>' + title + '</h3>' + body + '</section>';
     const own = '<div class="panel" id="gown"><h2>✏️ ' + L('Vaše údaje', 'Your details') + '</h2><div class="form one">' +
-      GP.GARDEN_OWN.map(f => GP.ui.field(f, g[f.key])).join('') +
-      '<div class="field"><span class="lbl">' + L('Rozměry (zatím obdélník)', 'Dimensions (rectangle for now)') + '</span><div class="row gap dims">' +
-      '<input type="text" inputmode="decimal" data-k="width" value="' + esc(g.width) + '" placeholder="' + L('šířka', 'width') + '"><span>m ×</span>' +
-      '<input type="text" inputmode="decimal" data-k="length" value="' + esc(g.length) + '" placeholder="' + L('délka', 'length') + '"><span>m</span></div>' +
-      '<div class="row gap small"><span>' + L('Rozloha', 'Area') + ': <b id="areaOut">' + (area ? area.toLocaleString(L('cs-CZ', 'en-GB')) + ' m²' : '—') + '</b></span>' +
-      '<button class="link small" data-act="fitgrid">↦ ' + L('nastavit podle toho mřížku plánu', 'size the plan grid to match') + '</button></div></div>' +
-      '<div class="field"><span class="lbl">' + L('Orientace a svah', 'Aspect and slope') + '</span><div class="row gap">' +
-      selectHtml(GP.ASPECTS, g.aspect, 'data-k="aspect" title="' + L('Kam je svah natočený', 'Which way the slope faces') + '"') +
-      selectHtml(GP.SLOPES, g.slope, 'data-k="slope" title="' + L('Sklon', 'Slope') + '"') + '</div>' +
-      '<p class="small muted" id="slopeText">' + esc(slopeText(g)) + '</p>' +
-      (g.aspectNote ? '<input type="text" data-k="aspectNote" value="' + esc(g.aspectNote) + '">' : '') + '</div>' +
-      '<div class="field"><span class="lbl">' + L('Typ půdy (lze vybrat více)', 'Soil type (several allowed)') + '</span><div class="chips" data-chips="soils">' +
+      GP.GARDEN_OWN.map(f => GP.ui.field(f, g[f.key])).join('') + '</div>' +
+      group('📐 ' + L('Rozměry a orientace', 'Size and aspect'), '<div class="pair">' +
+        '<div class="field"><span class="lbl">' + L('Rozměry (zatím obdélník)', 'Dimensions (rectangle for now)') + '</span><div class="row gap dims">' +
+        '<input type="text" inputmode="decimal" data-k="width" value="' + esc(g.width) + '" placeholder="' + L('šířka', 'width') + '"><span>m ×</span>' +
+        '<input type="text" inputmode="decimal" data-k="length" value="' + esc(g.length) + '" placeholder="' + L('délka', 'length') + '"><span>m</span></div>' +
+        '<span class="small">' + L('Rozloha', 'Area') + ': <b id="areaOut">' + (area ? area.toLocaleString(L('cs-CZ', 'en-GB')) + ' m²' : '—') + '</b></span>' +
+        '<button class="link small left" data-act="fitgrid">↦ ' + L('nastavit podle toho mřížku plánu', 'size the plan grid to match') + '</button></div>' +
+        '<div class="field"><span class="lbl">' + L('Orientace', 'Aspect') + '</span>' +
+        selectHtml(GP.ASPECTS, g.aspect, 'data-k="aspect" title="' + L('Kam je svah natočený', 'Which way the slope faces') + '"') +
+        '<span class="lbl">' + L('Sklon', 'Slope') + '</span>' +
+        selectHtml(GP.SLOPES, g.slope, 'data-k="slope"') +
+        (g.aspectNote ? '<input type="text" data-k="aspectNote" value="' + esc(g.aspectNote) + '">' : '') + '</div></div>' +
+        '<p class="small muted" id="slopeText">' + esc(slopeText(g)) + '</p>') +
+      group('🌱 ' + L('Půda a voda', 'Soil and water'),
+        '<div class="field"><span class="lbl">' + L('Typ půdy (lze vybrat více)', 'Soil type (several allowed)') + '</span><div class="chips" data-chips="soils">' +
       GP.SOILS.map(s => '<button type="button" class="chip' + (g.soils.includes(s[0]) ? ' on' : '') + '" data-v="' + s[0] + '">' + esc(L(s[1], s[2])) + '</button>').join('') + '</div>' +
       '</div>' +
       '<div class="field"><span class="lbl">' + L('Půdní reakce (pH)', 'Soil reaction (pH)') + '</span><div class="row gap">' +
@@ -216,8 +220,8 @@
       g.water.map((w, i) => '<div class="water-row" data-w="' + i + '">' + selectHtml(GP.WATER_SOURCES, w.type, 'data-wk="type"') +
         (HAS_VOLUME.includes(w.type) ? '<label class="row small">' + L('objem', 'volume') + ' <input type="text" inputmode="decimal" class="num" data-wk="capacity" value="' + esc(w.capacity) + '"> m³</label>' : '<span></span>') +
         '<input type="text" data-wk="note" value="' + esc(w.note) + '" placeholder="' + L('poznámka', 'note') + '"><button class="link danger" data-delw="' + i + '">✕</button></div>').join('') +
-      '</div><button class="btn small" data-act="addwater">+ ' + L('Přidat zdroj vody', 'Add water source') + '</button></div>' +
-      '<div class="field"><span class="lbl">' + L('Okolí zahrady', 'Surroundings') + '</span><div class="sides">' +
+      '</div><button class="btn small" data-act="addwater">+ ' + L('Přidat zdroj vody', 'Add water source') + '</button></div>') +
+      '<div class="form one"><div class="field"><span class="lbl">' + L('Okolí zahrady', 'Surroundings') + '</span><div class="sides">' +
       GP.SIDES.map(([k, cs, en]) => '<div class="side-sel"><span class="small"><b>' + esc(L(cs, en)) + '</b></span>' + selectHtml(GP.SURROUND, g.surround[k], 'data-k="surround.' + k + '"') +
         '<div class="row gap small"><label class="row">' + L('výška', 'height') + ' <input type="text" inputmode="decimal" class="num" data-k="surroundH.' + k + '" value="' + esc(g.surroundH[k]) + '"> m</label>' +
         '<label class="row" title="' + L('Vzdálenost překážky od hranice zahrady', 'Distance of the obstacle from the garden boundary') + '">' + L('od hranice', 'from edge') +
@@ -226,6 +230,7 @@
       GP.ui.field({ key: 'notes', type: 'longtext', cs: 'Poznámky', en: 'Notes' }, g.notes) + '</div></div>';
 
     const hasGps = !isNaN(num(g.lat)) && !isNaN(num(g.lon));
+    const sf = k => GP.ui.field(GP.GARDEN_SITE.find(f => f.key === k), g[k]);
     const site = '<div class="panel" id="gsite"><h2>🌍 ' + L('Poloha a klima (podle GPS)', 'Location and climate (from GPS)') + '</h2>' +
       '<div class="form one"><div class="field"><span class="lbl">GPS</span><div class="row gap dims">' +
       '<input type="text" inputmode="decimal" data-k="lat" value="' + esc(g.lat) + '" placeholder="' + L('šířka, např. 49.1951', 'latitude, e.g. 49.1951') + '">' +
@@ -236,7 +241,14 @@
       '</div></div>' +
       '<div class="row gap"><button class="btn primary" data-act="fetch"' + (hasGps ? '' : ' disabled') + '>🌐 ' + L('Stáhnout údaje z webu', 'Download data from the web') + '</button>' +
       '<span class="small muted" id="fetchStatus">' + (g.climate ? L('naposledy', 'last') + ' ' + esc(g.climate.fetched) : (hasGps ? '' : L('nejdřív zadejte GPS', 'enter GPS first'))) + '</span></div>' +
-      GP.GARDEN_SITE.map(f => GP.ui.field(f, g[f.key])).join('') + '</div>' +
+      sf('address') + sf('altitude') + '</div>' +
+      group('🌡️ ' + L('Teploty', 'Temperatures') + ' <span class="muted small">' + L('průměr za 5 let', '5-year average') + '</span>',
+        '<div class="pair">' + sf('minTemp') + sf('maxTemp') + sf('meanTemp') + sf('frostFree') + sf('lastFrost') + sf('firstFrost') + '</div>') +
+      group('🌧️ ' + L('Srážky', 'Precipitation') + ' <span class="muted small">' + L('průměr za 5 let', '5-year average') + '</span>',
+        '<div class="pair rain">' + sf('rainfall') + '<div class="field"><span class="lbl">' + L('Po měsících (mm)', 'By month (mm)') + '</span>' +
+        (g.climate && g.climate.monthlyRain ? GP.geo.rainChart(g.climate.monthlyRain)
+          : '<p class="muted small">' + (g.climate ? L('Stáhněte údaje z webu znovu – graf je nový.', 'Download the data again – the chart is new.') : L('Zobrazí se po stažení údajů z webu.', 'Shown after downloading data from the web.')) + '</p>') +
+        '</div></div>') +
       GP.geo.historyTable(g.climate) +
       '<p class="muted small">' + L('Údaje můžete ručně upravit. Nejnižší zimní teplota se porovnává s mrazuvzdorností rostlin.', 'You can edit the values by hand. The lowest winter temperature is checked against plant hardiness.') + '</p></div>';
 

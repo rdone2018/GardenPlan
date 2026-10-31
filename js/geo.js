@@ -58,11 +58,18 @@
     const lastYear = new Date().getFullYear() - 1, firstYear = lastYear - years + 1;
     const url = 'https://archive-api.open-meteo.com/v1/archive?latitude=' + lat + '&longitude=' + lon +
       '&start_date=' + (firstYear - 1) + '-07-01&end_date=' + lastYear + '-12-31' +
-      '&daily=temperature_2m_min,temperature_2m_mean,precipitation_sum&timezone=Europe%2FBerlin';
+      '&daily=temperature_2m_min,temperature_2m_max,temperature_2m_mean,precipitation_sum&timezone=Europe%2FBerlin';
     const r = await fetch(url);
     if (!r.ok) throw new Error('Open-Meteo archive ' + r.status);
     const d = (await r.json()).daily;
-    const rows = d.time.map((t, i) => ({ t, y: +t.slice(0, 4), m: +t.slice(5, 7), tmin: d.temperature_2m_min[i], tmean: d.temperature_2m_mean[i], rain: d.precipitation_sum[i] }));
+    const rows = d.time.map((t, i) => ({ t, y: +t.slice(0, 4), m: +t.slice(5, 7), tmin: d.temperature_2m_min[i], tmax: d.temperature_2m_max[i], tmean: d.temperature_2m_mean[i], rain: d.precipitation_sum[i] }));
+    // Average precipitation per calendar month over the full years
+    const monthlyRain = [];
+    for (let m = 1; m <= 12; m++) {
+      const sums = [];
+      for (let y = firstYear; y <= lastYear; y++) sums.push(rows.filter(x => x.y === y && x.m === m).reduce((s, x) => s + (x.rain || 0), 0));
+      monthlyRain.push(Math.round(avg(sums)));
+    }
     const out = [];
     for (let y = firstYear; y <= lastYear; y++) {
       const inYear = rows.filter(x => x.y === y);
@@ -70,10 +77,12 @@
       const spring = inYear.filter(x => x.m <= 6 && x.tmin != null && x.tmin <= 0);
       const autumn = inYear.filter(x => x.m >= 7 && x.tmin != null && x.tmin <= 0);
       const wmin = winter.reduce((best, x) => (x.tmin != null && (!best || x.tmin < best.tmin) ? x : best), null);
+      const smax = inYear.reduce((best, x) => (x.tmax != null && (!best || x.tmax > best.tmax) ? x : best), null);
       const last = spring.length ? spring[spring.length - 1].t : null, first = autumn.length ? autumn[0].t : null;
       out.push({
         year: y,
         winterMin: wmin ? round1(wmin.tmin) : null, winterMinDate: wmin ? wmin.t : null,
+        summerMax: smax ? round1(smax.tmax) : null, summerMaxDate: smax ? smax.t : null,
         lastFrost: last, firstFrost: first,
         frostFree: last && first ? doyOf(first) - doyOf(last) : null,
         rain: Math.round(inYear.reduce((s, x) => s + (x.rain || 0), 0)),
@@ -83,8 +92,10 @@
     const absMin = out.reduce((b, x) => (x.winterMin != null && (!b || x.winterMin < b.winterMin) ? x : b), null);
     return {
       years: out,
+      monthlyRain,
       summary: {
         minTemp: round1(avg(out.map(x => x.winterMin))),
+        maxTemp: round1(avg(out.map(x => x.summerMax))),
         absMin: absMin && absMin.winterMin, absMinYear: absMin && absMin.year,
         lastFrost: avg(out.map(x => x.lastFrost && doyOf(x.lastFrost))),
         firstFrost: avg(out.map(x => x.firstFrost && doyOf(x.firstFrost))),
@@ -106,12 +117,13 @@
     if (clim.status === 'fulfilled') {
       const s = clim.value.summary;
       g.minTemp = s.minTemp != null ? String(s.minTemp) : '';
+      g.maxTemp = s.maxTemp != null ? String(s.maxTemp) : '';
       g.lastFrost = s.lastFrost != null ? '~ ' + fmtDay(s.lastFrost) : '';
       g.firstFrost = s.firstFrost != null ? '~ ' + fmtDay(s.firstFrost) : '';
       g.frostFree = s.frostFree ? String(s.frostFree) : '';
       g.rainfall = s.rain ? String(s.rain) : '';
       g.meanTemp = s.meanT != null ? String(s.meanT) : '';
-      g.climate = { fetched: new Date().toISOString().slice(0, 10), lat, lon, years: clim.value.years, absMin: s.absMin, absMinYear: s.absMinYear };
+      g.climate = { fetched: new Date().toISOString().slice(0, 10), lat, lon, years: clim.value.years, monthlyRain: clim.value.monthlyRain, absMin: s.absMin, absMinYear: s.absMinYear };
     } else problems.push(L('klimatická data', 'climate data'));
     GP.saveNow();
     return problems;
@@ -121,13 +133,33 @@
     if (!c || !c.years) return '';
     const day = iso => (iso ? fmtDay(doyOf(iso)) : '—');
     return '<details class="history"><summary>📈 ' + L('Historie po letech', 'History by year') + ' (' + c.years[0].year + '–' + c.years[c.years.length - 1].year + ')</summary>' +
-      '<table class="tbl small"><thead><tr><th>' + L('Rok', 'Year') + '</th><th>' + L('Nejnižší teplota (zima)', 'Lowest temp (winter)') + '</th><th>' + L('Poslední jarní mráz', 'Last spring frost') + '</th><th>' +
+      '<table class="tbl small"><thead><tr><th>' + L('Rok', 'Year') + '</th><th>' + L('Nejnižší teplota (zima)', 'Lowest temp (winter)') + '</th><th>' + L('Nejvyšší teplota (léto)', 'Highest temp (summer)') + '</th><th>' + L('Poslední jarní mráz', 'Last spring frost') + '</th><th>' +
       L('První podzimní mráz', 'First autumn frost') + '</th><th>' + L('Bez mrazu (dní)', 'Frost-free (days)') + '</th><th>' + L('Srážky (mm)', 'Rain (mm)') + '</th><th>' + L('Prům. teplota', 'Mean temp') + '</th></tr></thead><tbody>' +
-      c.years.map(y => '<tr><td>' + y.year + '</td><td>' + (y.winterMin != null ? y.winterMin + ' °C <span class="muted">(' + day(y.winterMinDate) + ')</span>' : '—') + '</td><td>' + day(y.lastFrost) + '</td><td>' + day(y.firstFrost) +
+      c.years.map(y => '<tr><td>' + y.year + '</td><td>' + (y.winterMin != null ? y.winterMin + ' °C <span class="muted">(' + day(y.winterMinDate) + ')</span>' : '—') + '</td><td>' +
+        (y.summerMax != null ? y.summerMax + ' °C <span class="muted">(' + day(y.summerMaxDate) + ')</span>' : '—') + '</td><td>' + day(y.lastFrost) + '</td><td>' + day(y.firstFrost) +
         '</td><td>' + (y.frostFree || '—') + '</td><td>' + y.rain + '</td><td>' + (y.meanT != null ? y.meanT + ' °C' : '—') + '</td></tr>').join('') +
       '</tbody></table><p class="muted small">' + L('Nejnižší teplota za období', 'Lowest temperature of the period') + ': <b>' + c.absMin + ' °C</b> (' + c.absMinYear + '). ' +
       L('Zdroj: Open‑Meteo (reanalýza ERA5, mřížka cca 10 km, korigováno na nadmořskou výšku), mráz = teplota vzduchu ve 2 m ≤ 0 °C – přízemní mrazíky bývají častější. Staženo', 'Source: Open‑Meteo (ERA5 reanalysis, ~10 km grid, elevation-adjusted); frost = air temperature at 2 m ≤ 0 °C – ground frosts are more frequent. Fetched') +
       ' ' + esc(c.fetched) + '.</p></details>';
+  };
+
+  // Average precipitation per month as a small bar chart (SVG). Hovering a month shows its value.
+  GP.geo.rainChart = function (monthly) {
+    const W = 300, H = 132, top = 16, base = 112, slot = W / 12, bw = slot - 4, r = 4;
+    const max = Math.max(1, ...monthly);
+    const maxIdx = monthly.indexOf(Math.max(...monthly));
+    let bars = '';
+    monthly.forEach((v, i) => {
+      const h = Math.max(1, (v / max) * (base - top)), x = i * slot + 2, y = base - h, rr = Math.min(r, h);
+      const path = 'M' + x + ',' + base + 'V' + (y + rr) + 'Q' + x + ',' + y + ' ' + (x + rr) + ',' + y + 'H' + (x + bw - rr) +
+        'Q' + (x + bw) + ',' + y + ' ' + (x + bw) + ',' + (y + rr) + 'V' + base + 'Z';
+      bars += '<g class="rb' + (i === maxIdx ? ' max' : '') + '"><rect class="hit" x="' + i * slot + '" y="0" width="' + slot + '" height="' + H + '"/>' +
+        '<path d="' + path + '"/><text class="val" x="' + (x + bw / 2) + '" y="' + (y - 4) + '">' + v + '</text>' +
+        '<text class="mon" x="' + (x + bw / 2) + '" y="' + (base + 14) + '">' + esc(GP.monthShort(i + 1)) + '</text>' +
+        '<title>' + esc(GP.monthName(i + 1)) + ': ' + v + ' mm</title></g>';
+    });
+    return '<svg class="rain-chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(L('Průměrné srážky po měsících', 'Average precipitation by month')) + '">' +
+      '<line class="baseline" x1="0" x2="' + W + '" y1="' + base + '" y2="' + base + '"/>' + bars + '</svg>';
   };
 
   // ---------- map picker ----------
