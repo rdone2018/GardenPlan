@@ -42,6 +42,17 @@
     }).join('') + '</span>';
   }
 
+  // Flower colours as coloured labels ("bílá", "růžová"); dark text on light colours, white on dark ones.
+  function colorPills(p) {
+    const opts = GP.PLANT_OPTS.flowerColors;
+    return '<span class="cpills">' + (p.flowerColors || []).map(k => {
+      const hex = GP.optHex(opts, k) || '#ccc';
+      const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+      const light = 0.299 * r + 0.587 * g + 0.114 * b > 150;
+      return '<span class="cpill" style="background:' + hex + ';color:' + (light ? '#2b2b26' : '#fff') + '">' + esc(GP.optLabel(opts, k).split(' / ')[0]) + '</span>';
+    }).join('') + '</span>';
+  }
+
   GP.views.plants = {
     render() {
       const all = GP.state.plants, list = filtered();
@@ -75,10 +86,11 @@
       const rows = list.map(p => '<tr data-href="#/plant/' + p.id + '"><td class="thumb">' + (p.photo ? '<img src="' + p.photo + '" alt="">' : '') + '</td>' +
           '<td><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a><div class="italic small muted">' + esc(p.name_la) + '</div></td>' +
           '<td class="hide-sm">' + esc(GP.typeLabel(p.type)) + '</td>' +
+          '<td>' + colorPills(p) + '</td>' +
           '<td class="hide-sm small">' + gardensOf(p) + '</td>' +
           '<td>' + sectionBars(p) + '</td></tr>').join('');
-      return head + filters + '<div class="panel flush"><table class="tbl plants"><thead><tr><th></th><th>' + L('Název', 'Name') + '</th><th class="hide-sm">' + L('Typ', 'Type') + '</th><th class="hide-sm">' + L('Zahrada', 'Garden') + '</th><th title="' + L('Vyplněnost sekcí karty', 'How complete each section of the card is') + '"><span class="sec-head">' + SECTIONS().map(s => '<span>' + esc(s) + '</span>').join('') + '</span></th></tr></thead><tbody>' +
-        (rows || '<tr><td colspan="5" class="muted">' + L('Nic neodpovídá filtru.', 'Nothing matches the filter.') + '</td></tr>') + '</tbody></table></div>' +
+      return head + filters + '<div class="panel flush"><table class="tbl plants"><thead><tr><th></th><th>' + L('Název', 'Name') + '</th><th class="hide-sm">' + L('Typ', 'Type') + '</th><th>' + L('Barva květů', 'Flower colour') + '</th><th class="hide-sm">' + L('Zahrada', 'Garden') + '</th><th title="' + L('Vyplněnost sekcí karty', 'How complete each section of the card is') + '"><span class="sec-head">' + SECTIONS().map(s => '<span>' + esc(s) + '</span>').join('') + '</span></th></tr></thead><tbody>' +
+        (rows || '<tr><td colspan="6" class="muted">' + L('Nic neodpovídá filtru.', 'Nothing matches the filter.') + '</td></tr>') + '</tbody></table></div>' +
         '<p class="muted small">' + list.length + ' / ' + all.length + '</p>';
     },
     mount(root) {
