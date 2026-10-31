@@ -191,6 +191,25 @@
 
   const selectHtml = (list, value, attrs) => '<select ' + attrs + '>' + list.map(o => '<option value="' + o[0] + '"' + (o[0] === (value || '') ? ' selected' : '') + '>' + esc(L(o[1], o[2])) + '</option>').join('') + '</select>';
 
+  // Highest and lowest temperature per month; the 5-year averages of the yearly extremes are shown under them.
+  function tempCharts(g) {
+    const c = g.climate;
+    const deg = v => String(v).replace('.', L(',', '.')) + ' °C';
+    if (!c || !c.monthlyMax) {
+      return '<p class="muted small">' + (c ? L('Stáhněte údaje z webu znovu – grafy teplot jsou nové.', 'Download the data again – the temperature charts are new.')
+        : L('Grafy se zobrazí po stažení údajů z webu.', 'Charts appear after downloading data from the web.')) + '</p>' +
+        (g.minTemp ? '<p class="small">' + L('Nejnižší zimní', 'Lowest in winter') + ': <b>' + esc(deg(g.minTemp)) + '</b></p>' : '');
+    }
+    const cap = (title, value, note) => '<div class="chart-cap"><span class="lbl">' + title + '</span>' +
+      (value !== '' && value != null ? '<span class="small">' + note + ' <b>' + esc(deg(value)) + '</b></span>' : '') + '</div>';
+    return '<div>' + cap(L('Nejvyšší teploty po měsících', 'Highest temperature by month'), g.maxTemp, L('roční maximum', 'yearly max')) +
+      GP.geo.monthChart(c.monthlyMax, { kind: 'tmax', unit: '°', mark: 'max', label: L('Průměrná nejvyšší teplota v měsíci', 'Average highest temperature per month') }) + '</div>' +
+      '<div>' + cap(L('Nejnižší teploty po měsících', 'Lowest temperature by month'), g.minTemp, L('roční minimum', 'yearly min')) +
+      GP.geo.monthChart(c.monthlyMin, { kind: 'tmin', unit: '°', mark: 'min', label: L('Průměrná nejnižší teplota v měsíci', 'Average lowest temperature per month') }) + '</div>' +
+      '<p class="muted small">' + L('Sloupec = průměr nejvyšší / nejnižší teploty v daném měsíci za 5 let. Roční minimum se porovnává s mrazuvzdorností rostlin.',
+        'Bar = 5-year average of the month’s highest / lowest temperature. The yearly minimum is checked against plant hardiness.') + '</p>';
+  }
+
   function infoTab(g) {
     migrateGarden(g);
     const area = areaOf(g);
@@ -232,25 +251,26 @@
     const hasGps = !isNaN(num(g.lat)) && !isNaN(num(g.lon));
     const sf = k => GP.ui.field(GP.GARDEN_SITE.find(f => f.key === k), g[k]);
     const site = '<div class="panel" id="gsite"><h2>🌍 ' + L('Poloha a klima (podle GPS)', 'Location and climate (from GPS)') + '</h2>' +
-      '<div class="form one"><div class="field"><span class="lbl">GPS</span><div class="row gap dims">' +
-      '<input type="text" inputmode="decimal" data-k="lat" value="' + esc(g.lat) + '" placeholder="' + L('šířka, např. 49.1951', 'latitude, e.g. 49.1951') + '">' +
-      '<input type="text" inputmode="decimal" data-k="lon" value="' + esc(g.lon) + '" placeholder="' + L('délka, např. 16.6068', 'longitude, e.g. 16.6068') + '"></div>' +
-      '<div class="row gap"><button class="btn small" data-act="gps">📍 ' + L('Moje poloha', 'My location') + '</button>' +
+      '<div class="form one"><div class="row gap"><button class="btn small" data-act="gps">📍 ' + L('Moje poloha', 'My location') + '</button>' +
       '<button class="btn small" data-act="map">🗺️ ' + L('Vybrat na mapě / hledat adresu', 'Pick on map / search address') + '</button>' +
       (hasGps ? '<a class="btn small" target="_blank" rel="noopener" href="https://mapy.cz/letecka?x=' + encodeURIComponent(num(g.lon)) + '&y=' + encodeURIComponent(num(g.lat)) + '&z=19&source=coor&id=' + encodeURIComponent(num(g.lon) + ',' + num(g.lat)) + '">↗ Mapy.cz</a>' : '') +
-      '</div></div>' +
+      '</div>' +
       '<div class="row gap"><button class="btn primary" data-act="fetch"' + (hasGps ? '' : ' disabled') + '>🌐 ' + L('Stáhnout údaje z webu', 'Download data from the web') + '</button>' +
-      '<span class="small muted" id="fetchStatus">' + (g.climate ? L('naposledy', 'last') + ' ' + esc(g.climate.fetched) : (hasGps ? '' : L('nejdřív zadejte GPS', 'enter GPS first'))) + '</span></div>' +
-      sf('address') + sf('altitude') + '</div>' +
+      '<span class="small muted" id="fetchStatus">' + (g.climate ? L('naposledy', 'last') + ' ' + esc(g.climate.fetched) : (hasGps ? '' : L('nejdřív zvolte polohu', 'choose the location first'))) + '</span></div>' +
+      sf('address') +
+      '<div class="pair">' +
+      '<label class="field"><span class="lbl">' + L('Zeměpisná šířka (GPS, sever)', 'Latitude (GPS, north)') + '</span><input type="text" inputmode="decimal" data-k="lat" value="' + esc(g.lat) + '" placeholder="' + L('např. 49.1951', 'e.g. 49.1951') + '"></label>' +
+      '<label class="field"><span class="lbl">' + L('Zeměpisná délka (GPS, východ)', 'Longitude (GPS, east)') + '</span><input type="text" inputmode="decimal" data-k="lon" value="' + esc(g.lon) + '" placeholder="' + L('např. 16.6068', 'e.g. 16.6068') + '"></label>' +
+      sf('altitude') + '</div></div>' +
       group('🌡️ ' + L('Teploty', 'Temperatures') + ' <span class="muted small">' + L('průměr za 5 let', '5-year average') + '</span>',
-        '<div class="pair">' + sf('minTemp') + sf('maxTemp') + sf('meanTemp') + sf('frostFree') + sf('lastFrost') + sf('firstFrost') + '</div>') +
+        '<div class="temps"><div class="charts">' + tempCharts(g) + '</div><div class="form one">' + sf('meanTemp') + sf('frostFree') + sf('firstFrost') + sf('lastFrost') + '</div></div>') +
       group('🌧️ ' + L('Srážky', 'Precipitation') + ' <span class="muted small">' + L('průměr za 5 let', '5-year average') + '</span>',
         '<div class="pair rain">' + sf('rainfall') + '<div class="field"><span class="lbl">' + L('Po měsících (mm)', 'By month (mm)') + '</span>' +
         (g.climate && g.climate.monthlyRain ? GP.geo.rainChart(g.climate.monthlyRain)
           : '<p class="muted small">' + (g.climate ? L('Stáhněte údaje z webu znovu – graf je nový.', 'Download the data again – the chart is new.') : L('Zobrazí se po stažení údajů z webu.', 'Shown after downloading data from the web.')) + '</p>') +
         '</div></div>') +
       GP.geo.historyTable(g.climate) +
-      '<p class="muted small">' + L('Údaje můžete ručně upravit. Nejnižší zimní teplota se porovnává s mrazuvzdorností rostlin.', 'You can edit the values by hand. The lowest winter temperature is checked against plant hardiness.') + '</p></div>';
+      '<p class="muted small">' + L('Údaje můžete ručně upravit.', 'You can edit the values by hand.') + '</p></div>';
 
     return '<div class="garden-info">' + own + site + '</div>' +
       '<div class="row gap"><button class="btn primary" data-act="save">💾 ' + L('Uložit', 'Save') + '</button><span class="grow"></span>' +

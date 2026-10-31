@@ -222,14 +222,21 @@ input.num { width: 4.5rem; }
 .pair.rain { grid-template-columns: 1fr 2fr; }
 .pair .dims { flex-wrap: nowrap; gap: .3rem; }
 .pair .dims input { width: 4.5rem; }
-.rain-chart { width: 100%; height: auto; display: block; }
-.rain-chart .baseline { stroke: #cfcabb; stroke-width: 1; }
-.rain-chart path { fill: #4d7fd6; }
-.rain-chart .hit { fill: transparent; }
-.rain-chart text { font-size: 9px; text-anchor: middle; fill: var(--muted); }
-.rain-chart .val { fill: var(--ink); font-weight: 600; opacity: 0; }
-.rain-chart .rb.max .val, .rain-chart .rb:hover .val { opacity: 1; }
-.rain-chart .rb:hover path { fill: #2f5fb3; }
+.month-chart { width: 100%; height: auto; display: block; }
+.month-chart .baseline { stroke: #b9b3a2; stroke-width: 1; }
+.month-chart .hit { fill: transparent; }
+.month-chart text { font-size: 9px; text-anchor: middle; fill: var(--muted); }
+.month-chart .val { fill: var(--ink); font-weight: 600; opacity: 0; }
+.month-chart .rb.ext .val, .month-chart .rb:hover .val { opacity: 1; }
+.month-chart.rain path { fill: #4d7fd6; }
+.month-chart.rain .rb:hover path { fill: #2f5fb3; }
+.month-chart.tmax path { fill: #e07a3f; }
+.month-chart.tmax .rb:hover path { fill: #b85a24; }
+.month-chart.tmin path { fill: #5b9bd0; }
+.month-chart.tmin .rb:hover path { fill: #3a77ad; }
+.chart-cap { display: flex; justify-content: space-between; gap: .5rem; align-items: baseline; }
+.temps { display: grid; grid-template-columns: 2fr 1fr; gap: .8rem 1rem; align-items: start; }
+.temps .charts { display: flex; flex-direction: column; gap: .6rem; }
 .history { margin: .8rem 0; overflow-x: auto; }
 .history summary { cursor: pointer; font-weight: 600; margin-bottom: .4rem; }
 .history .tbl { font-size: .8rem; }
@@ -259,7 +266,7 @@ input.num { width: 4.5rem; }
   .hide-sm { display: none; }
   .plant-top { flex-direction: column; }
   .form { grid-template-columns: 1fr; }
-  .pair.rain { grid-template-columns: 1fr; }
+  .pair.rain, .temps { grid-template-columns: 1fr; }
   .etask { grid-template-columns: 1fr; }
   .water-row { grid-template-columns: 1fr auto; }
   .water-row input { grid-column: 1; }

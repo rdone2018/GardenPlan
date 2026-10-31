@@ -63,12 +63,20 @@
     if (!r.ok) throw new Error('Open-Meteo archive ' + r.status);
     const d = (await r.json()).daily;
     const rows = d.time.map((t, i) => ({ t, y: +t.slice(0, 4), m: +t.slice(5, 7), tmin: d.temperature_2m_min[i], tmax: d.temperature_2m_max[i], tmean: d.temperature_2m_mean[i], rain: d.precipitation_sum[i] }));
-    // Average precipitation per calendar month over the full years
-    const monthlyRain = [];
+    // Per calendar month, averaged over the full years: precipitation total, highest max and lowest min temperature
+    const monthlyRain = [], monthlyMax = [], monthlyMin = [];
     for (let m = 1; m <= 12; m++) {
-      const sums = [];
-      for (let y = firstYear; y <= lastYear; y++) sums.push(rows.filter(x => x.y === y && x.m === m).reduce((s, x) => s + (x.rain || 0), 0));
+      const sums = [], highs = [], lows = [];
+      for (let y = firstYear; y <= lastYear; y++) {
+        const days = rows.filter(x => x.y === y && x.m === m);
+        sums.push(days.reduce((s, x) => s + (x.rain || 0), 0));
+        const tx = days.map(x => x.tmax).filter(v => v != null), tn = days.map(x => x.tmin).filter(v => v != null);
+        if (tx.length) highs.push(Math.max(...tx));
+        if (tn.length) lows.push(Math.min(...tn));
+      }
       monthlyRain.push(Math.round(avg(sums)));
+      monthlyMax.push(round1(avg(highs)));
+      monthlyMin.push(round1(avg(lows)));
     }
     const out = [];
     for (let y = firstYear; y <= lastYear; y++) {
@@ -92,7 +100,7 @@
     const absMin = out.reduce((b, x) => (x.winterMin != null && (!b || x.winterMin < b.winterMin) ? x : b), null);
     return {
       years: out,
-      monthlyRain,
+      monthlyRain, monthlyMax, monthlyMin,
       summary: {
         minTemp: round1(avg(out.map(x => x.winterMin))),
         maxTemp: round1(avg(out.map(x => x.summerMax))),
@@ -123,7 +131,7 @@
       g.frostFree = s.frostFree ? String(s.frostFree) : '';
       g.rainfall = s.rain ? String(s.rain) : '';
       g.meanTemp = s.meanT != null ? String(s.meanT) : '';
-      g.climate = { fetched: new Date().toISOString().slice(0, 10), lat, lon, years: clim.value.years, monthlyRain: clim.value.monthlyRain, absMin: s.absMin, absMinYear: s.absMinYear };
+      g.climate = { fetched: new Date().toISOString().slice(0, 10), lat, lon, years: clim.value.years, monthlyRain: clim.value.monthlyRain, monthlyMax: clim.value.monthlyMax, monthlyMin: clim.value.monthlyMin, absMin: s.absMin, absMinYear: s.absMinYear };
     } else problems.push(L('klimatická data', 'climate data'));
     GP.saveNow();
     return problems;
@@ -143,24 +151,34 @@
       ' ' + esc(c.fetched) + '.</p></details>';
   };
 
-  // Average precipitation per month as a small bar chart (SVG). Hovering a month shows its value.
-  GP.geo.rainChart = function (monthly) {
-    const W = 300, H = 132, top = 16, base = 112, slot = W / 12, bw = slot - 4, r = 4;
-    const max = Math.max(1, ...monthly);
-    const maxIdx = monthly.indexOf(Math.max(...monthly));
+  // Monthly bar chart (SVG) growing from zero, so negative values (frost) point down.
+  // opts: { kind: CSS modifier, unit, mark: 'max' | 'min' (which month gets a permanent label), label }
+  GP.geo.monthChart = function (values, opts) {
+    const W = 300, slot = W / 12, bw = slot - 4, r = 4, pad = 14, plotH = 92;
+    const hi = Math.max(0, ...values), lo = Math.min(0, ...values), span = hi - lo || 1;
+    const zero = pad + (hi / span) * plotH, H = pad + plotH + pad + 14;
+    const yOf = v => zero - (v / span) * plotH;
+    const ext = opts.mark === 'min' ? Math.min(...values) : Math.max(...values);
+    const extIdx = values.indexOf(ext);
+    const fmt = v => String(v).replace('.', L(',', '.')) + opts.unit;
     let bars = '';
-    monthly.forEach((v, i) => {
-      const h = Math.max(1, (v / max) * (base - top)), x = i * slot + 2, y = base - h, rr = Math.min(r, h);
-      const path = 'M' + x + ',' + base + 'V' + (y + rr) + 'Q' + x + ',' + y + ' ' + (x + rr) + ',' + y + 'H' + (x + bw - rr) +
-        'Q' + (x + bw) + ',' + y + ' ' + (x + bw) + ',' + (y + rr) + 'V' + base + 'Z';
-      bars += '<g class="rb' + (i === maxIdx ? ' max' : '') + '"><rect class="hit" x="' + i * slot + '" y="0" width="' + slot + '" height="' + H + '"/>' +
-        '<path d="' + path + '"/><text class="val" x="' + (x + bw / 2) + '" y="' + (y - 4) + '">' + v + '</text>' +
-        '<text class="mon" x="' + (x + bw / 2) + '" y="' + (base + 14) + '">' + esc(GP.monthShort(i + 1)) + '</text>' +
-        '<title>' + esc(GP.monthName(i + 1)) + ': ' + v + ' mm</title></g>';
+    values.forEach((v, i) => {
+      const x = i * slot + 2, end = yOf(v), up = v >= 0;
+      const h = Math.max(1, Math.abs(end - zero)), y1 = up ? zero - h : zero + h, rr = Math.min(r, h);
+      // rounded corners only on the end away from zero
+      const path = up
+        ? 'M' + x + ',' + zero + 'V' + (y1 + rr) + 'Q' + x + ',' + y1 + ' ' + (x + rr) + ',' + y1 + 'H' + (x + bw - rr) + 'Q' + (x + bw) + ',' + y1 + ' ' + (x + bw) + ',' + (y1 + rr) + 'V' + zero + 'Z'
+        : 'M' + x + ',' + zero + 'V' + (y1 - rr) + 'Q' + x + ',' + y1 + ' ' + (x + rr) + ',' + y1 + 'H' + (x + bw - rr) + 'Q' + (x + bw) + ',' + y1 + ' ' + (x + bw) + ',' + (y1 - rr) + 'V' + zero + 'Z';
+      bars += '<g class="rb' + (i === extIdx ? ' ext' : '') + '"><rect class="hit" x="' + i * slot + '" y="0" width="' + slot + '" height="' + H + '"/>' +
+        '<path d="' + path + '"/><text class="val" x="' + (x + bw / 2) + '" y="' + (up ? y1 - 4 : y1 + 10) + '">' + esc(fmt(v)) + '</text>' +
+        '<title>' + esc(GP.monthName(i + 1)) + ': ' + esc(fmt(v)) + '</title></g>';
     });
-    return '<svg class="rain-chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(L('Průměrné srážky po měsících', 'Average precipitation by month')) + '">' +
-      '<line class="baseline" x1="0" x2="' + W + '" y1="' + base + '" y2="' + base + '"/>' + bars + '</svg>';
+    let months = '';
+    for (let i = 0; i < 12; i++) months += '<text class="mon" x="' + (i * slot + slot / 2) + '" y="' + (H - 3) + '">' + esc(GP.monthShort(i + 1)) + '</text>';
+    return '<svg class="month-chart ' + (opts.kind || '') + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(opts.label || '') + '">' +
+      '<line class="baseline" x1="0" x2="' + W + '" y1="' + zero + '" y2="' + zero + '"/>' + bars + months + '</svg>';
   };
+  GP.geo.rainChart = monthly => GP.geo.monthChart(monthly, { kind: 'rain', unit: '', mark: 'max', label: L('Průměrné srážky po měsících (mm)', 'Average precipitation by month (mm)') });
 
   // ---------- map picker ----------
   let leafletLoading = null;
