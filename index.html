@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GardenPlan</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">🌿 GardenPlan</a>
+    <nav class="nav" id="nav"></nav>
+    <div class="lang" id="lang"></div>
+  </header>
+  <main id="app" class="app"><p class="muted">…</p></main>
+
+  <!-- Classic scripts (no modules) so the app also works when index.html is opened directly from disk. -->
+  <script src="js/store.js"></script>
+  <script src="js/schema.js"></script>
+  <script src="js/csv.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/view-dashboard.js"></script>
+  <script src="js/view-gardens.js"></script>
+  <script src="js/view-plants.js"></script>
+  <script src="js/view-import.js"></script>
+  <script src="js/view-calendar.js"></script>
+  <script src="js/view-tech.js"></script>
+  <script src="js/view-data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
