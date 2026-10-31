@@ -154,31 +154,42 @@
   // Monthly bar chart (SVG) growing from zero, so negative values (frost) point down.
   // opts: { kind: CSS modifier, unit, mark: 'max' | 'min' (which month gets a permanent label), label }
   GP.geo.monthChart = function (values, opts) {
-    const W = 300, slot = W / 12, bw = slot - 4, r = 4, pad = 14, plotH = 92;
-    const hi = Math.max(0, ...values), lo = Math.min(0, ...values), span = hi - lo || 1;
+    const W = 300, left = 30, slot = (W - left) / 12, bw = slot - 4, r = 4, pad = 14, plotH = 92;
+    // Y axis: about 4–5 "nice" steps (1, 2, 5 × 10ⁿ); the scale is extended to whole steps
+    const rawHi = Math.max(0, ...values), rawLo = Math.min(0, ...values);
+    const rough = (rawHi - rawLo || 1) / 4, mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    const step = [1, 2, 5, 10].map(k => k * mag).find(s => s >= rough);
+    const hi = Math.ceil(rawHi / step) * step, lo = Math.floor(rawLo / step) * step, span = hi - lo || 1;
     const zero = pad + (hi / span) * plotH, H = pad + plotH + pad + 14;
     const yOf = v => zero - (v / span) * plotH;
+    let axis = '';
+    for (let t = lo; t <= hi + step / 2; t += step) {
+      const y = yOf(t), tv = Math.round(t * 10) / 10;
+      if (tv !== 0) axis += '<line class="grid" x1="' + left + '" x2="' + W + '" y1="' + y + '" y2="' + y + '"/>';
+      axis += '<text class="tick" x="' + (left - 4) + '" y="' + (y + 3) + '">' + String(tv).replace('.', L(',', '.')) + '</text>';
+    }
+    axis += '<text class="unit" x="0" y="8">' + esc(opts.axisUnit || '') + '</text>';
     const ext = opts.mark === 'min' ? Math.min(...values) : Math.max(...values);
     const extIdx = values.indexOf(ext);
     const fmt = v => String(v).replace('.', L(',', '.')) + opts.unit;
     let bars = '';
     values.forEach((v, i) => {
-      const x = i * slot + 2, end = yOf(v), up = v >= 0;
+      const x = left + i * slot + 2, end = yOf(v), up = v >= 0;
       const h = Math.max(1, Math.abs(end - zero)), y1 = up ? zero - h : zero + h, rr = Math.min(r, h);
       // rounded corners only on the end away from zero
       const path = up
         ? 'M' + x + ',' + zero + 'V' + (y1 + rr) + 'Q' + x + ',' + y1 + ' ' + (x + rr) + ',' + y1 + 'H' + (x + bw - rr) + 'Q' + (x + bw) + ',' + y1 + ' ' + (x + bw) + ',' + (y1 + rr) + 'V' + zero + 'Z'
         : 'M' + x + ',' + zero + 'V' + (y1 - rr) + 'Q' + x + ',' + y1 + ' ' + (x + rr) + ',' + y1 + 'H' + (x + bw - rr) + 'Q' + (x + bw) + ',' + y1 + ' ' + (x + bw) + ',' + (y1 - rr) + 'V' + zero + 'Z';
-      bars += '<g class="rb' + (i === extIdx ? ' ext' : '') + '"><rect class="hit" x="' + i * slot + '" y="0" width="' + slot + '" height="' + H + '"/>' +
+      bars += '<g class="rb' + (i === extIdx ? ' ext' : '') + '"><rect class="hit" x="' + (left + i * slot) + '" y="0" width="' + slot + '" height="' + H + '"/>' +
         '<path d="' + path + '"/><text class="val" x="' + (x + bw / 2) + '" y="' + (up ? y1 - 4 : y1 + 10) + '">' + esc(fmt(v)) + '</text>' +
         '<title>' + esc(GP.monthName(i + 1)) + ': ' + esc(fmt(v)) + '</title></g>';
     });
     let months = '';
-    for (let i = 0; i < 12; i++) months += '<text class="mon" x="' + (i * slot + slot / 2) + '" y="' + (H - 3) + '">' + esc(GP.monthShort(i + 1)) + '</text>';
-    return '<svg class="month-chart ' + (opts.kind || '') + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(opts.label || '') + '">' +
-      '<line class="baseline" x1="0" x2="' + W + '" y1="' + zero + '" y2="' + zero + '"/>' + bars + months + '</svg>';
+    for (let i = 0; i < 12; i++) months += '<text class="mon" x="' + (left + i * slot + slot / 2) + '" y="' + (H - 3) + '">' + esc(GP.monthShort(i + 1)) + '</text>';
+    return '<svg class="month-chart ' + (opts.kind || '') + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(opts.label || '') + '">' + axis +
+      '<line class="baseline" x1="' + left + '" x2="' + W + '" y1="' + zero + '" y2="' + zero + '"/>' + bars + months + '</svg>';
   };
-  GP.geo.rainChart = monthly => GP.geo.monthChart(monthly, { kind: 'rain', unit: '', mark: 'max', label: L('Průměrné srážky po měsících (mm)', 'Average precipitation by month (mm)') });
+  GP.geo.rainChart = monthly => GP.geo.monthChart(monthly, { kind: 'rain', unit: '', axisUnit: 'mm', mark: 'max', label: L('Průměrné srážky po měsících (mm)', 'Average precipitation by month (mm)') });
 
   // ---------- map picker ----------
   let leafletLoading = null;

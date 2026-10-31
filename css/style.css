@@ -117,7 +117,7 @@ details.group:not([open]) > summary h2::before { content: "▸ "; }
 .card:hover { border-color: var(--green-2); box-shadow: 0 2px 10px rgba(0,0,0,.05); }
 .card h3 { margin: .3rem 0; }
 .card p { margin: .2rem 0; }
-.mini { width: 100%; height: 120px; border-radius: 6px; background: #f3f1ea; }
+.mini { width: 100%; height: 120px; border-radius: 6px; background: #f3f1ea; object-fit: cover; display: block; }
 
 .tabs { display: flex; gap: .3rem; border-bottom: 1px solid var(--line); margin-bottom: 1rem; overflow-x: auto; }
 .tabs a { padding: .5rem .9rem; text-decoration: none; color: var(--muted); border-bottom: 3px solid transparent; white-space: nowrap; }
@@ -205,6 +205,9 @@ details.group:not([open]) > summary h2::before { content: "▸ "; }
 .saved { font-size: .8rem; color: #d7ead0; white-space: nowrap; }
 .saved.warn { color: #ffd98a; font-weight: 600; }
 .garden-info { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+.garden-top { display: grid; grid-template-columns: 180px 1fr; gap: 1rem; align-items: start; }
+.garden-top .photo-box img, .garden-top .photo-box .ph { width: 180px; height: 180px; }
+.garden-top .form { margin-bottom: 0; }
 .form.one { grid-template-columns: 1fr; }
 .dims input { width: 7.5rem; flex: none; }
 .chips { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: .4rem; }
@@ -227,6 +230,9 @@ input.num { width: 4.5rem; }
 .month-chart .hit { fill: transparent; }
 .month-chart text { font-size: 9px; text-anchor: middle; fill: var(--muted); }
 .month-chart .val { fill: var(--ink); font-weight: 600; opacity: 0; }
+.month-chart .grid { stroke: #ebe7dc; stroke-width: 1; }
+.month-chart .tick { text-anchor: end; font-size: 8px; }
+.month-chart .unit { text-anchor: start; font-size: 8px; font-weight: 600; }
 .month-chart .rb.ext .val, .month-chart .rb:hover .val { opacity: 1; }
 .month-chart.rain path { fill: #4d7fd6; }
 .month-chart.rain .rb:hover path { fill: #2f5fb3; }
@@ -235,8 +241,7 @@ input.num { width: 4.5rem; }
 .month-chart.tmin path { fill: #5b9bd0; }
 .month-chart.tmin .rb:hover path { fill: #3a77ad; }
 .chart-cap { display: flex; justify-content: space-between; gap: .5rem; align-items: baseline; }
-.temps { display: grid; grid-template-columns: 2fr 1fr; gap: .8rem 1rem; align-items: start; }
-.temps .charts { display: flex; flex-direction: column; gap: .6rem; }
+.temps { display: grid; grid-template-columns: 2fr 1fr; gap: .8rem 1rem; align-items: center; }
 .history { margin: .8rem 0; overflow-x: auto; }
 .history summary { cursor: pointer; font-weight: 600; margin-bottom: .4rem; }
 .history .tbl { font-size: .8rem; }
@@ -267,6 +272,8 @@ input.num { width: 4.5rem; }
   .plant-top { flex-direction: column; }
   .form { grid-template-columns: 1fr; }
   .pair.rain, .temps { grid-template-columns: 1fr; }
+  .garden-top { grid-template-columns: 110px 1fr; }
+  .garden-top .photo-box img, .garden-top .photo-box .ph { width: 110px; height: 110px; }
   .etask { grid-template-columns: 1fr; }
   .water-row { grid-template-columns: 1fr auto; }
   .water-row input { grid-column: 1; }

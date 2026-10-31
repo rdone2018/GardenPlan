@@ -79,7 +79,7 @@
       return '<div class="head"><h1>' + L('Zahrady', 'Gardens') + '</h1><button class="btn primary" data-act="new">+ ' + L('Nová zahrada', 'New garden') + '</button></div>' +
         (gs.length ? '<div class="cards">' + gs.map(g => {
           const n = GP.gardenPlacements(g.id).length;
-          return '<a class="card garden-card" href="#/garden/' + g.id + '">' + miniMap(g) +
+          return '<a class="card garden-card" href="#/garden/' + g.id + '">' + (g.photo ? '<img class="mini" src="' + g.photo + '" alt="">' : miniMap(g)) +
             '<h3>' + esc(g.name) + '</h3><p class="muted">' + esc([g.gardenType, g.address].filter(Boolean).join(' · ')) + '</p>' +
             '<p class="small">' + [g.area ? esc(g.area) + ' m²' : '', g.altitude ? esc(g.altitude) + ' m n. m.' : '', (g.soils || []).map(s => GP.optLabel(GP.SOILS, s)).join(', '), n + ' ' + L('rostlin', 'plants')].filter(Boolean).join(' · ') + '</p></a>';
         }).join('') + '</div>'
@@ -192,20 +192,25 @@
   const selectHtml = (list, value, attrs) => '<select ' + attrs + '>' + list.map(o => '<option value="' + o[0] + '"' + (o[0] === (value || '') ? ' selected' : '') + '>' + esc(L(o[1], o[2])) + '</option>').join('') + '</select>';
 
   // Highest and lowest temperature per month; the 5-year averages of the yearly extremes are shown under them.
-  function tempCharts(g) {
+  // Two rows: [highest-temperature chart | mean temp, frost-free days], [lowest-temperature chart | frost dates]
+  function tempSection(g, sf) {
     const c = g.climate;
     const deg = v => String(v).replace('.', L(',', '.')) + ' °C';
+    const cap = (title, value, note) => '<div class="chart-cap"><span class="lbl">' + title + '</span>' +
+      (value !== '' && value != null ? '<span class="small">' + note + ' <b>' + esc(deg(value)) + '</b></span>' : '') + '</div>';
+    const fields = keys => '<div class="form one">' + keys.map(sf).join('') + '</div>';
     if (!c || !c.monthlyMax) {
       return '<p class="muted small">' + (c ? L('Stáhněte údaje z webu znovu – grafy teplot jsou nové.', 'Download the data again – the temperature charts are new.')
         : L('Grafy se zobrazí po stažení údajů z webu.', 'Charts appear after downloading data from the web.')) + '</p>' +
-        (g.minTemp ? '<p class="small">' + L('Nejnižší zimní', 'Lowest in winter') + ': <b>' + esc(deg(g.minTemp)) + '</b></p>' : '');
+        '<div class="pair">' + ['meanTemp', 'frostFree', 'firstFrost', 'lastFrost'].map(sf).join('') + '</div>';
     }
-    const cap = (title, value, note) => '<div class="chart-cap"><span class="lbl">' + title + '</span>' +
-      (value !== '' && value != null ? '<span class="small">' + note + ' <b>' + esc(deg(value)) + '</b></span>' : '') + '</div>';
-    return '<div>' + cap(L('Nejvyšší teploty po měsících', 'Highest temperature by month'), g.maxTemp, L('roční maximum', 'yearly max')) +
-      GP.geo.monthChart(c.monthlyMax, { kind: 'tmax', unit: '°', mark: 'max', label: L('Průměrná nejvyšší teplota v měsíci', 'Average highest temperature per month') }) + '</div>' +
+    return '<div class="temps">' +
+      '<div>' + cap(L('Nejvyšší teploty po měsících', 'Highest temperature by month'), g.maxTemp, L('roční maximum', 'yearly max')) +
+      GP.geo.monthChart(c.monthlyMax, { kind: 'tmax', unit: '°', axisUnit: '°C', mark: 'max', label: L('Průměrná nejvyšší teplota v měsíci', 'Average highest temperature per month') }) + '</div>' +
+      fields(['meanTemp', 'frostFree']) +
       '<div>' + cap(L('Nejnižší teploty po měsících', 'Lowest temperature by month'), g.minTemp, L('roční minimum', 'yearly min')) +
-      GP.geo.monthChart(c.monthlyMin, { kind: 'tmin', unit: '°', mark: 'min', label: L('Průměrná nejnižší teplota v měsíci', 'Average lowest temperature per month') }) + '</div>' +
+      GP.geo.monthChart(c.monthlyMin, { kind: 'tmin', unit: '°', axisUnit: '°C', mark: 'min', label: L('Průměrná nejnižší teplota v měsíci', 'Average lowest temperature per month') }) + '</div>' +
+      fields(['firstFrost', 'lastFrost']) + '</div>' +
       '<p class="muted small">' + L('Sloupec = průměr nejvyšší / nejnižší teploty v daném měsíci za 5 let. Roční minimum se porovnává s mrazuvzdorností rostlin.',
         'Bar = 5-year average of the month’s highest / lowest temperature. The yearly minimum is checked against plant hardiness.') + '</p>';
   }
@@ -214,8 +219,11 @@
     migrateGarden(g);
     const area = areaOf(g);
     const group = (title, body) => '<section class="group"><h3>' + title + '</h3>' + body + '</section>';
-    const own = '<div class="panel" id="gown"><h2>✏️ ' + L('Vaše údaje', 'Your details') + '</h2><div class="form one">' +
-      GP.GARDEN_OWN.map(f => GP.ui.field(f, g[f.key])).join('') + '</div>' +
+    const own = '<div class="panel" id="gown"><h2>✏️ ' + L('Vaše údaje', 'Your details') + '</h2>' +
+      '<div class="garden-top"><div class="photo-box">' + (g.photo ? '<img src="' + g.photo + '" alt="">' : '<div class="ph">🏡</div>') +
+      '<div class="row"><label class="btn small">📷 ' + (g.photo ? L('Změnit', 'Change') : L('Nahrát fotku', 'Upload photo')) + '<input type="file" accept="image/*" data-act="gphoto" hidden></label>' +
+      (g.photo ? '<button class="link small danger" data-act="nogphoto" title="' + L('Odebrat fotku', 'Remove photo') + '">✕</button>' : '') + '</div></div>' +
+      '<div class="form one">' + GP.GARDEN_OWN.map(f => GP.ui.field(f, g[f.key])).join('') + '</div></div>' +
       group('📐 ' + L('Rozměry a orientace', 'Size and aspect'), '<div class="pair">' +
         '<div class="field"><span class="lbl">' + L('Rozměry (zatím obdélník)', 'Dimensions (rectangle for now)') + '</span><div class="row gap dims">' +
         '<input type="text" inputmode="decimal" data-k="width" value="' + esc(g.width) + '" placeholder="' + L('šířka', 'width') + '"><span>m ×</span>' +
@@ -263,7 +271,7 @@
       '<label class="field"><span class="lbl">' + L('Zeměpisná délka (GPS, východ)', 'Longitude (GPS, east)') + '</span><input type="text" inputmode="decimal" data-k="lon" value="' + esc(g.lon) + '" placeholder="' + L('např. 16.6068', 'e.g. 16.6068') + '"></label>' +
       sf('altitude') + '</div></div>' +
       group('🌡️ ' + L('Teploty', 'Temperatures') + ' <span class="muted small">' + L('průměr za 5 let', '5-year average') + '</span>',
-        '<div class="temps"><div class="charts">' + tempCharts(g) + '</div><div class="form one">' + sf('meanTemp') + sf('frostFree') + sf('firstFrost') + sf('lastFrost') + '</div></div>') +
+        tempSection(g, sf)) +
       group('🌧️ ' + L('Srážky', 'Precipitation') + ' <span class="muted small">' + L('průměr za 5 let', '5-year average') + '</span>',
         '<div class="pair rain">' + sf('rainfall') + '<div class="field"><span class="lbl">' + L('Po měsících (mm)', 'By month (mm)') + '</span>' +
         (g.climate && g.climate.monthlyRain ? GP.geo.rainChart(g.climate.monthlyRain)
@@ -368,6 +376,14 @@
         if (p) await setGps(p.lat, p.lon);
       } catch (err) { alert(err.message); }
     };
+    root.querySelector('[data-act=gphoto]').onchange = async e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      g.photo = await GP.ui.readImage(f, 1200);
+      GP.saveNow(); GP.render();
+    };
+    const nophoto = root.querySelector('[data-act=nogphoto]');
+    if (nophoto) nophoto.onclick = () => { delete g.photo; GP.saveNow(); GP.render(); };
     root.querySelector('[data-act=save]').onclick = () => { GP.saveNow(); GP.ui.toast(L('Uloženo ✓', 'Saved ✓')); };
     root.querySelector('[data-act=del]').onclick = () => {
       if (!confirm(L('Opravdu smazat zahradu „' + g.name + '“ i s jejím plánem?', 'Really delete garden "' + g.name + '" and its plan?'))) return;
