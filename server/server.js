@@ -83,8 +83,12 @@ app.get('/api/state', async (req, res, next) => {
 
 // Changes since the last save: { upsert: {plants: [..]}, delete: {plants: [ids]}, meta: {settings, taskDone, version} }
 app.post('/api/sync', async (req, res, next) => {
+  const t0 = Date.now(), kb = Math.round((Number(req.headers['content-length']) || 0) / 1024);
   try {
     const body = req.body || {};
+    const counts = Object.keys(COLLECTIONS).map(n => [n, ((body.upsert || {})[n] || []).length, ((body.delete || {})[n] || []).length]).filter(c => c[1] || c[2]);
+    const what = counts.map(([n, u, d]) => n + ' ' + u + (d ? '/-' + d : '')).join(', ') || 'meta';
+    console.log(new Date().toISOString(), 'sync start', kb + ' kB', what);
     await inTransaction(async conn => {
       for (const name of Object.keys(COLLECTIONS)) {
         const up = body.upsert && body.upsert[name];
@@ -94,6 +98,7 @@ app.post('/api/sync', async (req, res, next) => {
       }
       if (body.meta) await saveMeta(conn, body.meta);
     });
+    console.log(new Date().toISOString(), 'sync done', what, (Date.now() - t0) + ' ms');
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

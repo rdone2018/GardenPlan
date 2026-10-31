@@ -93,7 +93,8 @@ window.GP = window.GP || {};
   // -> { state } | { reachable, error }; reachable = our server answered (even with an error)
   async function fetchState() {
     try {
-      const r = await fetch('api/state', { cache: 'no-store' });
+      const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 60000);
+      const r = await fetch('api/state', { cache: 'no-store', signal: ctrl.signal }).finally(() => clearTimeout(timer));
       const json = (r.headers.get('content-type') || '').includes('json');
       if (r.ok && json) return { state: await r.json() };
       if (json) { let e = ''; try { e = (await r.json()).error || ''; } catch (x) { /* ignore */ } return { reachable: true, error: 'HTTP ' + r.status + (e ? ' – ' + e : '') }; }
@@ -103,13 +104,18 @@ window.GP = window.GP || {};
     }
   }
 
+  // number of items that differ from the last confirmed state (for the progress text)
+  const countDiff = next => COLLECTIONS.reduce((n, c) => n + [...next[c]].filter(([id, json]) => snap[c].get(id) !== json).length + [...snap[c].keys()].filter(id => !next[c].has(id)).length, 0);
+
   // Sends everything that differs from the last confirmed state, in batches; retries every 10 s on failure.
   function syncServer() {
     if (GP.storageMode !== 'server' || GP.offline || !snap) return;
     if (syncing) { again = true; return syncing; }
     syncing = (async () => {
+      let part = 0;
       try {
         for (;;) {
+          part++;
           const next = snapshot(GP.state);
           const body = { upsert: {}, delete: {} }, sent = [];
           let size = 0, any = false;
@@ -126,9 +132,14 @@ window.GP = window.GP || {};
             }
           }
           if (!any) break;
-          status(GP.L('Ukládám…', 'Saving…'));
           const text = JSON.stringify(body);
-          const r = await fetch('api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: text, keepalive: text.length < 60000 });
+          status(GP.L('Ukládám', 'Saving') + (part > 1 || sent.length < countDiff(next) ? ' ' + GP.L('část', 'part') + ' ' + part : '') + ' (' + Math.round(text.length / 1024) + ' kB)…');
+          // a request the server never answers must not hang forever
+          const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 60000);
+          let r;
+          try { r = await fetch('api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: text, keepalive: text.length < 60000, signal: ctrl.signal }); }
+          catch (e) { throw new Error(e.name === 'AbortError' ? GP.L('server neodpověděl do 60 s', 'no answer from the server within 60 s') : e.message); }
+          finally { clearTimeout(timer); }
           if (!r.ok) {
             let e = '';
             try { e = (await r.json()).error || ''; } catch (x) { /* proxy error page */ }
