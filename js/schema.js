@@ -219,26 +219,37 @@
   GP.optLabel = (list, v) => { const o = list.find(x => x[0] === v); return o ? L(o[1], o[2]) : ''; };
 
   // ---------- garden fields ----------
-  GP.GARDEN_FIELDS = [
+  // ---------- garden ----------
+  // Chosen by the owner (left column)
+  GP.GARDEN_OWN = [
     { key: 'name', type: 'text', cs: 'Název zahrady', en: 'Garden name' },
     { key: 'owner', type: 'text', cs: 'Majitel', en: 'Owner' },
-    { key: 'gardenType', type: 'text', cs: 'Typ zahrady', en: 'Garden type', list: ['okrasná', 'užitková', 'ovocný sad', 'smíšená', 'chalupa'] },
-    { key: 'address', type: 'text', cs: 'Adresa / lokalita', en: 'Address / location' },
-    { key: 'lat', type: 'text', cs: 'Zeměpisná šířka (GPS)', en: 'Latitude (GPS)' },
-    { key: 'lon', type: 'text', cs: 'Zeměpisná délka (GPS)', en: 'Longitude (GPS)' },
-    { key: 'altitude', type: 'text', cs: 'Nadmořská výška (m)', en: 'Altitude (m)' },
-    { key: 'area', type: 'text', cs: 'Rozloha (m²)', en: 'Area (m²)' },
-    { key: 'orientation', type: 'text', cs: 'Orientace / svah', en: 'Aspect / slope', list: ['rovina', 'jižní svah', 'severní svah', 'východní svah', 'západní svah'] },
-    { key: 'soilType', type: 'text', cs: 'Typ půdy', en: 'Soil type', list: ['písčitá', 'písčitohlinitá', 'hlinitá', 'jílovitohlinitá', 'jílovitá', 'kamenitá', 'rašelinná'] },
-    { key: 'soilPh', type: 'text', cs: 'pH půdy', en: 'Soil pH' },
-    { key: 'minTemp', type: 'text', cs: 'Nejnižší zimní teplota (°C)', en: 'Lowest winter temperature (°C)' },
-    { key: 'lastFrost', type: 'text', cs: 'Poslední jarní mrazy', en: 'Last spring frost', list: ['polovina dubna', 'konec dubna', 'polovina května (zmrzlí muži)', 'konec května'] },
-    { key: 'firstFrost', type: 'text', cs: 'První podzimní mrazy', en: 'First autumn frost', list: ['konec září', 'polovina října', 'konec října', 'listopad'] },
-    { key: 'rainfall', type: 'text', cs: 'Roční srážky (mm)', en: 'Annual rainfall (mm)' },
-    { key: 'waterSource', type: 'text', cs: 'Zdroj vody', en: 'Water source', list: ['vodovod', 'studna', 'sud / nádrž na dešťovku', 'potok'] },
-    { key: 'surroundings', type: 'longtext', cs: 'Okolí (stromy, budovy, vítr, sousedé…)', en: 'Surroundings (trees, buildings, wind, neighbours…)' },
-    { key: 'notes', type: 'longtext', cs: 'Poznámky', en: 'Notes' }
+    { key: 'gardenType', type: 'text', cs: 'Typ zahrady', en: 'Garden type', list: ['okrasná', 'užitková', 'ovocný sad', 'smíšená', 'chalupa', 'předzahrádka'] }
   ];
+  // Driven by GPS / downloaded from the web (right column); all stay editable
+  GP.GARDEN_SITE = [
+    { key: 'address', type: 'text', cs: 'Adresa', en: 'Address' },
+    { key: 'altitude', type: 'text', cs: 'Nadmořská výška (m)', en: 'Altitude (m)' },
+    { key: 'minTemp', type: 'text', cs: 'Nejnižší zimní teplota (°C, průměr 5 let)', en: 'Lowest winter temperature (°C, 5-year avg)' },
+    { key: 'lastFrost', type: 'text', cs: 'Poslední jarní mrazy (průměr)', en: 'Last spring frost (avg)' },
+    { key: 'firstFrost', type: 'text', cs: 'První podzimní mrazy (průměr)', en: 'First autumn frost (avg)' },
+    { key: 'frostFree', type: 'text', cs: 'Bezmrazé období (dní)', en: 'Frost-free period (days)' },
+    { key: 'rainfall', type: 'text', cs: 'Roční srážky (mm, průměr)', en: 'Annual rainfall (mm, avg)' },
+    { key: 'meanTemp', type: 'text', cs: 'Průměrná roční teplota (°C)', en: 'Mean annual temperature (°C)' }
+  ];
+  GP.ASPECTS = [['', '—', '—'], ['flat', 'rovina', 'flat'], ['N', 'sever (S)', 'north (N)'], ['NE', 'severovýchod (SV)', 'north-east (NE)'], ['E', 'východ (V)', 'east (E)'],
+    ['SE', 'jihovýchod (JV)', 'south-east (SE)'], ['S', 'jih (J)', 'south (S)'], ['SW', 'jihozápad (JZ)', 'south-west (SW)'], ['W', 'západ (Z)', 'west (W)'], ['NW', 'severozápad (SZ)', 'north-west (NW)']];
+  GP.SLOPES = [['', '—', '—'], ['0', 'rovina (0–2°)', 'flat (0–2°)'], ['1', 'mírný (2–7°)', 'gentle (2–7°)'], ['2', 'střední (7–15°)', 'moderate (7–15°)'],
+    ['3', 'prudký (15–30°)', 'steep (15–30°)'], ['4', 'velmi prudký (nad 30°)', 'very steep (over 30°)']];
+  GP.SOILS = [['sand', 'písčitá', 'sandy'], ['loamysand', 'hlinitopísčitá', 'loamy sand'], ['sandyloam', 'písčitohlinitá', 'sandy loam'], ['loam', 'hlinitá', 'loam'],
+    ['clayloam', 'jílovitohlinitá', 'clay loam'], ['clay', 'jílovitá', 'clay'], ['stony', 'kamenitá', 'stony'], ['peat', 'rašelinná', 'peaty'], ['fill', 'navážka', 'made ground']];
+  GP.WATER_SOURCES = [['mains', 'vodovod', 'mains water'], ['well', 'studna', 'well'], ['tank', 'retenční nádrž (dešťovka)', 'rainwater tank'], ['barrel', 'sud na dešťovku', 'water butt'],
+    ['stream', 'potok / rybník', 'stream / pond'], ['grey', 'šedá voda', 'grey water'], ['other', 'jiný', 'other']];
+  GP.SIDES = [['N', 'Na severu', 'To the north'], ['E', 'Na východě', 'To the east'], ['S', 'Na jihu', 'To the south'], ['W', 'Na západě', 'To the west']];
+  GP.SURROUND = [['', '—', '—'], ['garden', 'zahrada souseda', 'neighbour’s garden'], ['house', 'dům / budova', 'house / building'], ['street', 'ulice / silnice', 'street / road'],
+    ['broadleaf', 'listnatý les', 'broadleaf forest'], ['conifer', 'jehličnatý les', 'coniferous forest'], ['mixed', 'smíšený les', 'mixed forest'],
+    ['trees', 'vzrostlé stromy', 'tall trees'], ['field', 'pole', 'field'], ['meadow', 'louka / pastva', 'meadow / pasture'], ['orchard', 'sad', 'orchard'],
+    ['water', 'vodní plocha / potok', 'water / stream'], ['wall', 'plot / zeď', 'fence / wall'], ['hedge', 'živý plot', 'hedge'], ['open', 'otevřená krajina', 'open land'], ['other', 'jiné', 'other']];
 
   GP.EQUIP_KINDS = [['watering', 'Zavlažování', 'Watering'], ['mowing', 'Sekání', 'Mowing'], ['lighting', 'Osvětlení', 'Lighting'],
     ['camera', 'Kamery', 'Cameras'], ['sensor', 'Čidla', 'Sensors'], ['tools', 'Nářadí', 'Tools'], ['other', 'Jiné', 'Other']];

@@ -96,7 +96,8 @@
 
       const missing = GP.PLANT_FIELDS.filter(f => f.core && !GP.isFilled(p, f)).map(GP.fieldLabel);
       let html = '<div class="head"><h1><a href="#/plants" class="back">←</a> <span id="pname">' + esc(GP.plantName(p)) + '</span></h1>' +
-        '<div class="row gap"><span id="pbar">' + GP.ui.bar(pct) + '</span><button class="btn danger" data-act="del">' + L('Smazat', 'Delete') + '</button></div></div>' +
+        '<div class="row gap"><span id="pbar">' + GP.ui.bar(pct) + '</span><button class="btn primary" data-act="save">💾 ' + L('Uložit', 'Save') + '</button>' +
+        '<button class="btn danger" data-act="del">' + L('Smazat', 'Delete') + '</button></div></div>' +
         '<div class="plant-top"><div class="photo-box">' + (p.photo ? '<img src="' + p.photo + '" alt="">' : '<div class="ph">🌿</div>') +
         '<label class="btn small">📷 ' + (p.photo ? L('Změnit foto', 'Change photo') : L('Přidat foto', 'Add photo')) + '<input type="file" accept="image/*" data-act="photo" hidden></label>' +
         (p.photo ? ' <button class="link small danger" data-act="nophoto">✕</button>' : '') + '</div>' +
@@ -118,6 +119,7 @@
         if (/^name_|^cultivar/.test(key)) root.querySelector('#pname').textContent = GP.plantName(p);
         root.querySelector('#pbar').innerHTML = GP.ui.bar(GP.completeness(p));
       });
+      root.querySelector('[data-act=save]').onclick = () => { GP.saveNow(); GP.ui.toast(L('Uloženo ✓', 'Saved ✓')); };
       root.querySelector('[data-act=del]').onclick = () => {
         if (!confirm(L('Smazat rostlinu „' + GP.plantName(p) + '“ z katalogu i ze všech zahrad?', 'Delete "' + GP.plantName(p) + '" from the catalog and all gardens?'))) return;
         GP.state.plants = GP.state.plants.filter(x => x !== p);

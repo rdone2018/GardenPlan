@@ -81,7 +81,7 @@
           const n = GP.gardenPlacements(g.id).length;
           return '<a class="card garden-card" href="#/garden/' + g.id + '/plan">' + miniMap(g) +
             '<h3>' + esc(g.name) + '</h3><p class="muted">' + esc([g.gardenType, g.address].filter(Boolean).join(' · ')) + '</p>' +
-            '<p class="small">' + [g.area ? esc(g.area) + ' m²' : '', g.altitude ? esc(g.altitude) + ' m n. m.' : '', g.soilType ? esc(g.soilType) : '', n + ' ' + L('rostlin', 'plants')].filter(Boolean).join(' · ') + '</p></a>';
+            '<p class="small">' + [g.area ? esc(g.area) + ' m²' : '', g.altitude ? esc(g.altitude) + ' m n. m.' : '', (g.soils || []).map(s => GP.optLabel(GP.SOILS, s)).join(', '), n + ' ' + L('rostlin', 'plants')].filter(Boolean).join(' · ') + '</p></a>';
         }).join('') + '</div>'
           : '<div class="empty"><p>' + L('Zatím tu není žádná zahrada. Založte první – zadáte polohu, půdu, okolí a nakreslíte plán.', 'No gardens yet. Create the first one – location, soil, surroundings and a grid plan.') + '</p></div>');
     },
@@ -127,30 +127,159 @@
   };
 
   // ----- details -----
-  function infoTab(g) {
-    const map = g.lat && g.lon ? '<a class="btn" target="_blank" rel="noopener" href="https://mapy.cz/zakladni?x=' + encodeURIComponent(g.lon) + '&y=' + encodeURIComponent(g.lat) + '&z=18&source=coor&id=' + encodeURIComponent(g.lon + ',' + g.lat) + '">🗺️ ' + L('Otevřít na Mapy.cz', 'Open on Mapy.cz') + '</a>' : '';
-    return '<div class="panel"><p class="muted">' + L('Vše, co ovlivňuje péči: poloha, výška, půda, mrazy, okolí. Nejnižší zimní teplota se porovnává s mrazuvzdorností rostlin.', 'Everything that affects care: location, altitude, soil, frosts, surroundings. The lowest winter temperature is checked against plant hardiness.') + '</p>' +
-      '<div class="form" id="gform">' + GP.GARDEN_FIELDS.map(f => GP.ui.field(f, g[f.key])).join('') + '</div>' +
-      '<div class="row gap">' + map + '<button class="btn" data-act="gps">📍 ' + L('Vyplnit GPS z této polohy', 'Fill GPS from current location') + '</button><span class="grow"></span>' +
-      '<button class="btn danger" data-act="del">' + L('Smazat zahradu', 'Delete garden') + '</button></div></div>';
+  const num = v => parseFloat(String(v == null ? '' : v).replace(',', '.'));
+  const areaOf = g => (num(g.width) > 0 && num(g.length) > 0 ? Math.round(num(g.width) * num(g.length) * 10) / 10 : null);
+
+  // Older versions stored soil / water / orientation as free text.
+  function migrateGarden(g) {
+    if (g.soilType && !g.soils) { g.soils = []; g.soilNote = [g.soilNote, g.soilType].filter(Boolean).join(', '); delete g.soilType; }
+    if (g.waterSource && !g.water) { g.water = [{ type: 'other', capacity: '', note: g.waterSource }]; delete g.waterSource; }
+    if (g.orientation && !g.aspect) { g.aspectNote = g.orientation; delete g.orientation; }
+    g.soils = g.soils || [];
+    g.water = g.water || [];
+    g.surround = g.surround || {};
   }
+
+  const selectHtml = (list, value, attrs) => '<select ' + attrs + '>' + list.map(o => '<option value="' + o[0] + '"' + (o[0] === (value || '') ? ' selected' : '') + '>' + esc(L(o[1], o[2])) + '</option>').join('') + '</select>';
+
+  function infoTab(g) {
+    migrateGarden(g);
+    const area = areaOf(g);
+    const own = '<div class="panel" id="gown"><h2>✏️ ' + L('Vaše údaje', 'Your details') + '</h2><div class="form one">' +
+      GP.GARDEN_OWN.map(f => GP.ui.field(f, g[f.key])).join('') +
+      '<div class="field"><span class="lbl">' + L('Rozměry (zatím obdélník)', 'Dimensions (rectangle for now)') + '</span><div class="row gap dims">' +
+      '<input type="text" inputmode="decimal" data-k="width" value="' + esc(g.width) + '" placeholder="' + L('šířka', 'width') + '"><span>m ×</span>' +
+      '<input type="text" inputmode="decimal" data-k="length" value="' + esc(g.length) + '" placeholder="' + L('délka', 'length') + '"><span>m</span></div>' +
+      '<div class="row gap small"><span>' + L('Rozloha', 'Area') + ': <b id="areaOut">' + (area ? area.toLocaleString(L('cs-CZ', 'en-GB')) + ' m²' : '—') + '</b></span>' +
+      '<button class="link small" data-act="fitgrid">↦ ' + L('nastavit podle toho mřížku plánu', 'size the plan grid to match') + '</button></div></div>' +
+      '<div class="field"><span class="lbl">' + L('Orientace a svah', 'Aspect and slope') + '</span><div class="row gap">' +
+      selectHtml(GP.ASPECTS, g.aspect, 'data-k="aspect" title="' + L('Kam je svah natočený', 'Which way the slope faces') + '"') +
+      selectHtml(GP.SLOPES, g.slope, 'data-k="slope" title="' + L('Sklon', 'Slope') + '"') + '</div>' +
+      (g.aspectNote ? '<input type="text" data-k="aspectNote" value="' + esc(g.aspectNote) + '">' : '') + '</div>' +
+      '<div class="field"><span class="lbl">' + L('Typ půdy (lze vybrat více)', 'Soil type (several allowed)') + '</span><div class="chips" data-chips="soils">' +
+      GP.SOILS.map(s => '<button type="button" class="chip' + (g.soils.includes(s[0]) ? ' on' : '') + '" data-v="' + s[0] + '">' + esc(L(s[1], s[2])) + '</button>').join('') + '</div>' +
+      '<div class="row gap"><input type="text" data-k="soilNote" value="' + esc(g.soilNote) + '" placeholder="' + L('poznámka k půdě (kde je jaká…)', 'soil note (where is which…)') + '">' +
+      '<label class="row small">pH <input type="text" class="num" data-k="soilPh" value="' + esc(g.soilPh) + '"></label></div></div>' +
+      '<div class="field"><span class="lbl">' + L('Zdroje vody', 'Water sources') + '</span><div id="water">' +
+      g.water.map((w, i) => '<div class="water-row" data-w="' + i + '">' + selectHtml(GP.WATER_SOURCES, w.type, 'data-wk="type"') +
+        '<input type="text" data-wk="capacity" value="' + esc(w.capacity) + '" placeholder="' + L('kapacita, např. 10 m³', 'capacity, e.g. 10 m³') + '">' +
+        '<input type="text" data-wk="note" value="' + esc(w.note) + '" placeholder="' + L('poznámka', 'note') + '"><button class="link danger" data-delw="' + i + '">✕</button></div>').join('') +
+      '</div><button class="btn small" data-act="addwater">+ ' + L('Přidat zdroj vody', 'Add water source') + '</button></div>' +
+      '<div class="field"><span class="lbl">' + L('Okolí zahrady', 'Surroundings') + '</span><div class="sides">' +
+      GP.SIDES.map(([k, cs, en]) => '<label class="side-sel"><span class="small">' + esc(L(cs, en)) + '</span>' + selectHtml(GP.SURROUND, g.surround[k], 'data-k="surround.' + k + '"') + '</label>').join('') + '</div>' +
+      '<textarea data-k="surroundings" rows="2" placeholder="' + L('podrobnosti: výška stromů, stín, vítr…', 'details: tree height, shade, wind…') + '">' + esc(g.surroundings) + '</textarea></div>' +
+      GP.ui.field({ key: 'notes', type: 'longtext', cs: 'Poznámky', en: 'Notes' }, g.notes) + '</div></div>';
+
+    const hasGps = !isNaN(num(g.lat)) && !isNaN(num(g.lon));
+    const site = '<div class="panel" id="gsite"><h2>🌍 ' + L('Poloha a klima (podle GPS)', 'Location and climate (from GPS)') + '</h2>' +
+      '<div class="form one"><div class="field"><span class="lbl">GPS</span><div class="row gap dims">' +
+      '<input type="text" inputmode="decimal" data-k="lat" value="' + esc(g.lat) + '" placeholder="' + L('šířka, např. 49.1951', 'latitude, e.g. 49.1951') + '">' +
+      '<input type="text" inputmode="decimal" data-k="lon" value="' + esc(g.lon) + '" placeholder="' + L('délka, např. 16.6068', 'longitude, e.g. 16.6068') + '"></div>' +
+      '<div class="row gap"><button class="btn small" data-act="gps">📍 ' + L('Moje poloha', 'My location') + '</button>' +
+      '<button class="btn small" data-act="map">🗺️ ' + L('Vybrat na mapě / hledat adresu', 'Pick on map / search address') + '</button>' +
+      (hasGps ? '<a class="btn small" target="_blank" rel="noopener" href="https://mapy.cz/letecka?x=' + encodeURIComponent(num(g.lon)) + '&y=' + encodeURIComponent(num(g.lat)) + '&z=19&source=coor&id=' + encodeURIComponent(num(g.lon) + ',' + num(g.lat)) + '">↗ Mapy.cz</a>' : '') +
+      '</div></div>' +
+      '<div class="row gap"><button class="btn primary" data-act="fetch"' + (hasGps ? '' : ' disabled') + '>🌐 ' + L('Stáhnout údaje z webu', 'Download data from the web') + '</button>' +
+      '<span class="small muted" id="fetchStatus">' + (g.climate ? L('naposledy', 'last') + ' ' + esc(g.climate.fetched) : (hasGps ? '' : L('nejdřív zadejte GPS', 'enter GPS first'))) + '</span></div>' +
+      GP.GARDEN_SITE.map(f => GP.ui.field(f, g[f.key])).join('') + '</div>' +
+      GP.geo.historyTable(g.climate) +
+      '<p class="muted small">' + L('Údaje můžete ručně upravit. Nejnižší zimní teplota se porovnává s mrazuvzdorností rostlin.', 'You can edit the values by hand. The lowest winter temperature is checked against plant hardiness.') + '</p></div>';
+
+    return '<div class="garden-info">' + own + site + '</div>' +
+      '<div class="row gap"><button class="btn primary" data-act="save">💾 ' + L('Uložit', 'Save') + '</button><span class="grow"></span>' +
+      '<button class="btn danger" data-act="del">' + L('Smazat zahradu', 'Delete garden') + '</button></div>';
+  }
+
   function mountInfo(root, g) {
-    GP.ui.bind(root.querySelector('#gform'), g);
+    GP.ui.bind(root.querySelector('#gown'), g, key => {
+      if (key === 'width' || key === 'length') {
+        const a = areaOf(g);
+        g.area = a ? String(a) : '';
+        root.querySelector('#areaOut').textContent = a ? a.toLocaleString(L('cs-CZ', 'en-GB')) + ' m²' : '—';
+      }
+    });
+    GP.ui.bind(root.querySelector('#gsite'), g, key => {
+      if (key === 'lat' || key === 'lon') root.querySelector('[data-act=fetch]').disabled = isNaN(num(g.lat)) || isNaN(num(g.lon));
+    });
+
+    root.querySelector('[data-chips=soils]').addEventListener('click', e => {
+      const b = e.target.closest('.chip');
+      if (!b) return;
+      b.classList.toggle('on');
+      g.soils = [...root.querySelectorAll('[data-chips=soils] .chip.on')].map(x => x.dataset.v);
+      GP.save();
+    });
+    const water = root.querySelector('#water');
+    const wupd = e => {
+      const row = e.target.closest('[data-w]'), k = e.target.dataset.wk;
+      if (!row || !k) return;
+      g.water[+row.dataset.w][k] = e.target.value;
+      GP.save();
+    };
+    water.addEventListener('input', wupd);
+    water.addEventListener('change', wupd);
+    water.addEventListener('click', e => {
+      const d = e.target.closest('[data-delw]');
+      if (d) { g.water.splice(+d.dataset.delw, 1); GP.saveNow(); GP.render(); }
+    });
+    root.querySelector('[data-act=addwater]').onclick = () => { g.water.push({ type: g.water.length ? 'mains' : 'tank', capacity: '', note: '' }); GP.saveNow(); GP.render(); };
+
+    root.querySelector('[data-act=fitgrid]').onclick = () => {
+      const w = num(g.width), l = num(g.length);
+      if (!(w > 0 && l > 0)) return GP.ui.toast(L('Nejdřív zadejte šířku a délku.', 'Enter width and length first.'));
+      let cell = g.grid.cellM || 1;
+      while (Math.max(w, l) / cell > 120) cell *= 2; // keep the grid manageable for big plots
+      g.grid = { cols: Math.max(2, Math.ceil(w / cell)), rows: Math.max(2, Math.ceil(l / cell)), cellM: cell };
+      GP.saveNow();
+      GP.ui.toast(L('Mřížka plánu', 'Plan grid') + ': ' + g.grid.cols + ' × ' + g.grid.rows + ' (' + cell + ' m)');
+    };
+
+    const setGps = async (lat, lon) => {
+      g.lat = String(lat); g.lon = String(lon);
+      GP.saveNow(); GP.render();
+      await fetchData();
+    };
+    async function fetchData() {
+      const st = document.getElementById('fetchStatus'), btn = document.querySelector('[data-act=fetch]');
+      if (st) st.textContent = L('Stahuji adresu, výšku a klima za 5 let…', 'Downloading address, altitude and 5 years of climate…');
+      if (btn) btn.disabled = true;
+      try {
+        const problems = await GP.geo.fillGarden(g);
+        GP.render();
+        GP.ui.toast(problems.length ? L('Nepodařilo se stáhnout: ', 'Could not download: ') + problems.join(', ') : L('Údaje staženy ✓', 'Data downloaded ✓'));
+      } catch (e) {
+        if (st) st.textContent = e.message;
+        if (btn) btn.disabled = false;
+      }
+    }
+    root.querySelector('[data-act=fetch]').onclick = fetchData;
+    root.querySelector('[data-act=gps]').onclick = async e => {
+      const b = e.currentTarget;
+      b.disabled = true;
+      b.textContent = '📍 ' + L('Zjišťuji polohu…', 'Locating…');
+      try {
+        const pos = await GP.geo.current();
+        await setGps(pos.coords.latitude.toFixed(6), pos.coords.longitude.toFixed(6));
+        if (pos.coords.accuracy > 200) GP.ui.toast(L('Poloha je jen přibližná (±', 'Location is approximate (±') + Math.round(pos.coords.accuracy) + ' m) – ' + L('upřesněte ji na mapě.', 'refine it on the map.'));
+      } catch (err) {
+        b.disabled = false;
+        b.textContent = '📍 ' + L('Moje poloha', 'My location');
+        alert(err.message);
+      }
+    };
+    root.querySelector('[data-act=map]').onclick = async () => {
+      try {
+        const p = await GP.geo.pickOnMap(num(g.lat), num(g.lon));
+        if (p) await setGps(p.lat, p.lon);
+      } catch (err) { alert(err.message); }
+    };
+    root.querySelector('[data-act=save]').onclick = () => { GP.saveNow(); GP.ui.toast(L('Uloženo ✓', 'Saved ✓')); };
     root.querySelector('[data-act=del]').onclick = () => {
       if (!confirm(L('Opravdu smazat zahradu „' + g.name + '“ i s jejím plánem?', 'Really delete garden "' + g.name + '" and its plan?'))) return;
       GP.state.gardens = GP.state.gardens.filter(x => x !== g);
       GP.state.placements = GP.state.placements.filter(p => p.gardenId !== g.id);
       GP.saveNow();
       GP.go('gardens');
-    };
-    root.querySelector('[data-act=gps]').onclick = () => {
-      if (!navigator.geolocation) return GP.ui.toast(L('Poloha není dostupná', 'Location not available'));
-      navigator.geolocation.getCurrentPosition(pos => {
-        g.lat = pos.coords.latitude.toFixed(6);
-        g.lon = pos.coords.longitude.toFixed(6);
-        if (pos.coords.altitude != null && !g.altitude) g.altitude = Math.round(pos.coords.altitude);
-        GP.saveNow(); GP.render();
-      }, () => GP.ui.toast(L('Polohu se nepodařilo zjistit', 'Could not get location')));
     };
   }
 

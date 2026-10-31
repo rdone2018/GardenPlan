@@ -201,6 +201,28 @@ details.group:not([open]) > summary h2::before { content: "▸ "; }
 .steps li { margin: .35rem 0; }
 .steps li.ok a { color: var(--muted); text-decoration: line-through; }
 
+/* garden details */
+.saved { font-size: .8rem; color: #d7ead0; white-space: nowrap; }
+.garden-info { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+.form.one { grid-template-columns: 1fr; }
+.dims input { width: 7.5rem; flex: none; }
+.chips { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: .4rem; }
+.chip { border: 1px solid var(--line); background: #fff; border-radius: 99px; padding: .2rem .7rem; cursor: pointer; font-size: .85rem; }
+.chip.on { background: var(--green-2); border-color: var(--green-2); color: #fff; }
+input.num { width: 4.5rem; }
+.water-row { display: grid; grid-template-columns: 1.3fr 1fr 1.3fr auto; gap: .4rem; margin-bottom: .4rem; align-items: center; }
+.sides { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem .8rem; margin-bottom: .4rem; }
+.side-sel { display: flex; flex-direction: column; gap: .1rem; }
+.field > .btn { align-self: flex-start; }
+.history { margin: .8rem 0; overflow-x: auto; }
+.history summary { cursor: pointer; font-weight: 600; margin-bottom: .4rem; }
+.history .tbl { font-size: .8rem; }
+.modal { position: fixed; inset: 0; background: rgba(20,30,18,.55); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.modal-box { background: #fff; border-radius: var(--radius); padding: 1rem; width: min(900px, 100%); display: flex; flex-direction: column; gap: .6rem; max-height: 100%; }
+.modal .map { height: min(60vh, 520px); border-radius: 8px; border: 1px solid var(--line); }
+.search-res { max-height: 9rem; overflow: auto; font-size: .85rem; }
+.search-res .link { text-align: left; }
+
 #toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%) translateY(150%); background: #23301f; color: #fff; padding: .6rem 1rem; border-radius: 8px; transition: transform .25s; z-index: 50; }
 #toast.show { transform: translateX(-50%) translateY(0); }
 
@@ -208,6 +230,7 @@ details.group:not([open]) > summary h2::before { content: "▸ "; }
   .plan { grid-template-columns: 1fr; }
   .side { position: static; max-height: none; order: 2; }
   .dash { grid-template-columns: 1fr; }
+  .garden-info { grid-template-columns: 1fr; }
   .filters { grid-template-columns: 1fr 1fr; }
   .filters input { grid-column: 1 / -1; }
 }
@@ -221,4 +244,7 @@ details.group:not([open]) > summary h2::before { content: "▸ "; }
   .plant-top { flex-direction: column; }
   .form { grid-template-columns: 1fr; }
   .etask { grid-template-columns: 1fr; }
+  .water-row { grid-template-columns: 1fr auto; }
+  .water-row input { grid-column: 1; }
+  .saved { display: none; }
 }

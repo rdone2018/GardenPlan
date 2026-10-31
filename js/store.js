@@ -30,7 +30,13 @@ window.GP = window.GP || {};
   function write() {
     if (!db) return;
     try {
-      db.transaction(STORE, 'readwrite').objectStore(STORE).put(GP.state, KEY);
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(GP.state, KEY);
+      tx.oncomplete = () => {
+        const el = document.getElementById('saved');
+        if (el) el.textContent = '✓ ' + GP.L('Uloženo', 'Saved') + ' ' + new Date().toLocaleTimeString(GP.L('cs-CZ', 'en-GB'), { hour: '2-digit', minute: '2-digit' });
+      };
+      tx.onerror = () => console.error('Save failed', tx.error);
     } catch (e) {
       console.error('Save failed', e);
     }
