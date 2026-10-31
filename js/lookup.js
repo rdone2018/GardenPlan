@@ -164,6 +164,131 @@
     return out;
   };
 
+  // ---------- photos of a cultivar (Wikimedia Commons search) ----------
+  // "Rhododendron 'Nova Zembla'" finds photos of that cultivar; without a cultivar the Latin name is searched.
+  GP.lookup.photoQuery = p => {
+    const cv = (p.cultivar || '').replace(/['‘’"´`]/g, '').trim(), la = (p.name_la || '').replace(/\s*[×x]\s.*$|\s+(agg|var|subsp)\..*$/, '').trim();
+    if (cv) return (la.split(' ')[0] || p.name_cs || '') + ' "' + cv + '"';
+    return la || p.name_cs || '';
+  };
+  GP.lookup.commonsPhotos = async function (query, limit) {
+    const d = await getJson('https://commons.wikimedia.org/w/api.php?format=json&origin=*&action=query&generator=search&gsrnamespace=6&gsrlimit=' + (limit || 12) +
+      '&gsrsearch=' + encodeURIComponent(query) + '&prop=imageinfo&iiprop=url|mime|extmetadata&iiurlwidth=600');
+    const strip = s => String(s || '').replace(/<[^>]*>/g, '').trim();
+    return Object.values((d.query || {}).pages || {}).sort((a, b) => a.index - b.index)
+      .filter(pg => pg.imageinfo && /^image\/(jpeg|png)$/.test(pg.imageinfo[0].mime))
+      .map(pg => {
+        const ii = pg.imageinfo[0], meta = ii.extmetadata || {};
+        return { value: ii.thumburl || ii.url, title: pg.title.replace(/^File:/, '').replace(/\.\w+$/, ''), page: ii.descriptionurl, source: 'Wikimedia Commons',
+          credit: [strip((meta.Artist || {}).value), strip((meta.LicenseShortName || {}).value)].filter(Boolean).join(', ') };
+      });
+  };
+  // only photos whose file name mentions the cultivar ("Rhododendron 'Persil'" is not 'Cunningham's White')
+  const squash = s => GP.norm(s).replace(/[^a-z0-9]/g, '');
+  GP.lookup.cultivarPhotos = async function (p) {
+    if (!p.cultivar) return [];
+    const cv = squash(p.cultivar);
+    return (await GP.lookup.commonsPhotos(GP.lookup.photoQuery(p), 12)).filter(ph => squash(ph.title).includes(cv));
+  };
+  const setPhoto = async (p, ph) => {
+    const blob = await (await fetch(ph.value)).blob();
+    p.photo = await GP.ui.readImage(blob, 900);
+    p.photoCredit = 'Wikimedia Commons' + (ph.credit ? ' – ' + ph.credit : '');
+    p.photoPage = ph.page || '';
+  };
+
+  // Photo picker for one plant: search box + grid of Commons photos
+  GP.lookup.photoDialog = function (p, onDone) {
+    const box = document.createElement('div');
+    box.className = 'modal';
+    box.innerHTML = '<div class="modal-box lookup"><div class="row gap"><b class="grow">🖼 ' + GP.L('Fotka z Wikimedia Commons', 'Photo from Wikimedia Commons') + ' – ' + GP.esc(GP.plantName(p)) + '</b>' +
+      '<button class="link" data-x>✕</button></div><div class="row gap"><input type="search" class="grow" data-q value="' + GP.esc(GP.lookup.photoQuery(p)) + '">' +
+      '<button class="btn" data-go>' + GP.L('Hledat', 'Search') + '</button></div><p class="small muted">' +
+      GP.L('Odrůdu dejte do uvozovek, např. Rhododendron "Nova Zembla". Kliknutím fotku vyberete.', 'Put the cultivar in quotes, e.g. Rhododendron "Nova Zembla". Click a photo to use it.') +
+      '</p><div class="ph-grid"></div></div>';
+    document.body.appendChild(box);
+    const grid = box.querySelector('.ph-grid'), close = () => box.remove();
+    box.querySelector('[data-x]').onclick = close;
+    box.addEventListener('click', e => { if (e.target === box) close(); });
+    let found = [];
+    async function search() {
+      grid.innerHTML = '<p class="muted">' + GP.L('Hledám…', 'Searching…') + '</p>';
+      try { found = await GP.lookup.commonsPhotos(box.querySelector('[data-q]').value.trim(), 18); }
+      catch (e) { grid.innerHTML = '<p class="alert">' + GP.esc(e.message) + '</p>'; return; }
+      grid.innerHTML = found.length ? found.map((ph, i) => '<button class="ph" data-i="' + i + '" title="' + GP.esc(ph.title + (ph.credit ? ' – ' + ph.credit : '')) + '"><img src="' + GP.esc(ph.value) + '" alt="" loading="lazy"><span>' + GP.esc(ph.title) + '</span></button>').join('')
+        : '<p>' + GP.L('Nic nenalezeno – zkuste jen rod nebo jiný zápis odrůdy.', 'Nothing found – try just the genus or another spelling.') + '</p>';
+    }
+    grid.addEventListener('click', async e => {
+      const b = e.target.closest('[data-i]');
+      if (!b) return;
+      b.classList.add('busy');
+      try { await setPhoto(p, found[+b.dataset.i]); GP.saveNow(); close(); if (onDone) onDone(); }
+      catch (err) { b.classList.remove('busy'); GP.ui.toast(GP.L('Fotku se nepodařilo stáhnout', 'Could not download the photo')); }
+    });
+    box.querySelector('[data-go]').onclick = search;
+    box.querySelector('[data-q]').addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
+    search();
+  };
+
+  // Bulk: photos of the right cultivar for plants that have none or only a general one from Wikimedia
+  GP.lookup.bulkPhotos = function (plants, onDone) {
+    const L = GP.L, esc = GP.esc;
+    const rows = plants.map(p => ({ p, state: 'wait', photos: [], pick: -1 }));
+    const box = document.createElement('div');
+    box.className = 'modal';
+    box.innerHTML = '<div class="modal-box lookup wide"><div class="row gap"><b class="grow">🖼 ' + L('Fotky odrůd', 'Cultivar photos') + ' – ' + plants.length + ' ' + L('rostlin', 'plants') + '</b>' +
+      '<button class="link" data-x>✕</button></div><p class="small muted">' + L('Hledám fotky přímo dané odrůdy na Wikimedia Commons. Klikněte na fotku, kterou chcete použít (zelený rámeček), nebo nechte „ponechat“. Pak Použít.',
+        'Looking for photos of the exact cultivar on Wikimedia Commons. Click the photo to use (green frame) or leave "keep". Then Apply.') + '</p>' +
+      '<div class="lk-progress small muted"></div><div class="lk-scroll"><table class="tbl lk-bulk"><tbody></tbody></table></div>' +
+      '<div class="row gap"><button class="btn primary" data-apply disabled>' + L('Použít', 'Apply') + '</button></div></div>';
+    document.body.appendChild(box);
+    const tbody = box.querySelector('tbody'), prog = box.querySelector('.lk-progress');
+    let stop = false, running = true;
+    box.querySelector('[data-x]').onclick = () => { stop = true; box.remove(); };
+    const draw = () => {
+      tbody.innerHTML = rows.map((r, ri) => '<tr><td class="thumb">' + (r.p.photo ? '<img src="' + r.p.photo + '" alt="">' : '') + '</td><td><b>' + esc(GP.plantName(r.p)) + '</b></td><td><div class="ph-row">' +
+        (r.state === 'wait' ? '<span class="muted">…</span>' : !r.photos.length ? '<span class="muted">' + L('fotka odrůdy nenalezena', 'no cultivar photo found') + '</span>' :
+          r.photos.slice(0, 5).map((ph, i) => '<button class="ph mini' + (r.pick === i ? ' on' : '') + '" data-r="' + ri + '" data-i="' + i + '" title="' + esc(ph.title) + '"><img src="' + esc(ph.value) + '" alt="" loading="lazy"></button>').join('') +
+          '<button class="ph mini keep' + (r.pick === -1 ? ' on' : '') + '" data-r="' + ri + '" data-i="-1">' + L('ponechat', 'keep') + '</button>') + '</div></td></tr>').join('');
+      const done = rows.filter(r => r.state !== 'wait').length, found = rows.filter(r => r.photos.length).length;
+      prog.textContent = (running ? L('Hledám', 'Searching') + ' ' + done + ' / ' + rows.length : L('Hotovo', 'Done')) + ' · ' + L('nalezeno', 'found') + ' ' + found;
+      box.querySelector('[data-apply]').disabled = running || !rows.some(r => r.pick >= 0);
+    };
+    tbody.addEventListener('click', e => {
+      const b = e.target.closest('[data-r]');
+      if (!b) return;
+      rows[+b.dataset.r].pick = +b.dataset.i;
+      draw();
+    });
+    (async () => {
+      let next = 0;
+      const worker = async () => {
+        while (!stop && next < rows.length) {
+          const r = rows[next++];
+          try { r.photos = await GP.lookup.cultivarPhotos(r.p); r.pick = r.photos.length ? 0 : -1; } catch (e) { r.photos = []; }
+          r.state = 'ok';
+          if (!stop) draw();
+        }
+      };
+      await Promise.all([worker(), worker(), worker()]);
+      running = false;
+      if (!stop) draw();
+    })();
+    box.querySelector('[data-apply]').onclick = async e => {
+      e.target.disabled = true;
+      const todo = rows.filter(r => r.pick >= 0);
+      let n = 0, failed = 0;
+      for (const r of todo) {
+        prog.textContent = L('Ukládám', 'Saving') + ' ' + (++n) + ' / ' + todo.length + '…';
+        try { await setPhoto(r.p, r.photos[r.pick]); } catch (err) { failed++; }
+      }
+      GP.saveNow(); box.remove();
+      GP.ui.toast(L('Fotky změněny', 'Photos changed') + ': ' + (todo.length - failed) + (failed ? ' · ' + L('chyba', 'failed') + ': ' + failed : ''));
+      if (onDone) onDone();
+    };
+    draw();
+  };
+
   // Apply chosen proposals; photos are downloaded and stored like an uploaded photo.
   GP.lookup.apply = async function (p, props, keys) {
     for (const k of keys) {
@@ -324,6 +449,12 @@
         prog.textContent = L('Ukládám', 'Saving') + ' ' + (++n) + ' / ' + todo.length + '…';
         try {
           const props = await propose(r.p, r.cands[r.pick], r.rest, r.matched);
+          // a photo of the cultivar itself beats the general photo of the species
+          const cultivar = r.p.cultivar || (props.cultivar || {}).value;
+          if (photos && !r.p.photo && cultivar) {
+            const cp = (await GP.lookup.cultivarPhotos(Object.assign({}, r.p, { cultivar, name_la: r.p.name_la || (props.name_la || {}).value })))[0];
+            if (cp) props.photo = cp;
+          }
           const keys = FIELDS.filter(k => props[k] && (k === 'photo' ? photos && !r.p.photo : props[k].tick || !r.p[k]));
           await GP.lookup.apply(r.p, props, keys);
         } catch (err) { failed++; }

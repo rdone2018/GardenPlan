@@ -48,6 +48,7 @@
       const opt = (v, label, cur) => '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(label) + '</option>';
       const head = '<div class="head"><h1>' + L('Rostliny', 'Plants') + ' <span class="muted">(' + all.length + ')</span></h1>' +
         '<div class="row gap">' + (all.length ? '<button class="btn" data-act="bulk" title="' + L('Pro rostliny ve výběru bez latinského názvu nebo bez fotky', 'For plants in the list without a Latin name or photo') + '">🔎 ' + L('Doplnit z databází', 'Fill from databases') + '</button>' : '') +
+        (all.some(p => p.cultivar) ? '<button class="btn" data-act="cvphotos" title="' + L('Fotky přímo dané odrůdy z Wikimedia Commons', 'Photos of the exact cultivar from Wikimedia Commons') + '">🖼 ' + L('Fotky odrůd', 'Cultivar photos') + '</button>' : '') +
         '<a class="btn" href="#/import">⬆ ' + L('Import CSV', 'Import CSV') + '</a><button class="btn" data-act="export">⬇ ' + L('Export CSV', 'Export CSV') + '</button>' +
         '<button class="btn primary" data-act="new">+ ' + L('Nová rostlina', 'New plant') + '</button></div></div>';
       if (!all.length) {
@@ -89,6 +90,13 @@
         const todo = filtered().filter(p => !p.name_la || !p.photo);
         if (!todo.length) return GP.ui.toast(L('Všechny rostliny ve výběru už mají latinský název i fotku – další údaje doplňte na kartě.', 'All plants in the list already have a Latin name and a photo – use the plant card.'));
         GP.lookup.bulk(todo, () => GP.render());
+      };
+      const cph = root.querySelector('[data-act=cvphotos]');
+      if (cph) cph.onclick = () => {
+        // cultivars without a photo or with a general one downloaded from Wikimedia (own photos are left alone)
+        const todo = filtered().filter(p => p.cultivar && (!p.photo || /^Wikimedia/.test(p.photoCredit || '')));
+        if (!todo.length) return GP.ui.toast(L('Ve výběru nejsou odrůdy bez vlastní fotky.', 'No cultivars without an own photo in the list.'));
+        GP.lookup.bulkPhotos(todo, () => GP.render());
       };
       const ex = root.querySelector('[data-act=export]');
       if (ex) ex.onclick = () => GP.ui.download('rostliny-' + new Date().toISOString().slice(0, 10) + '.csv', GP.csv.exportPlants(), 'text/csv;charset=utf-8');
@@ -136,6 +144,7 @@
         '<div class="plant-top"><div class="photo-box">' + (p.photo ? '<img src="' + p.photo + '" alt="">' : '<div class="ph">🌿</div>') +
         '<label class="btn small">📷 ' + (p.photo ? L('Změnit foto', 'Change photo') : L('Přidat foto', 'Add photo')) + '<input type="file" accept="image/*" data-act="photo" hidden></label>' +
         (p.photo ? ' <button class="link small danger" data-act="nophoto">✕</button>' : '') +
+        '<button class="link small" data-act="pickphoto">🖼 ' + L('Vybrat z Wikimedia', 'Pick from Wikimedia') + '</button>' +
         (p.photo && p.photoCredit ? '<div class="credit">' + (p.photoPage ? '<a target="_blank" rel="noopener" href="' + esc(p.photoPage) + '">' + esc(p.photoCredit) + '</a>' : esc(p.photoCredit)) + '</div>' : '') + '</div>' +
         '<div class="grow"><p class="names"><b>CZ</b> ' + esc(p.name_cs || '—') + ' · <b>SK</b> ' + esc(p.name_sk || '—') + ' · <b>EN</b> ' + esc(p.name_en || '—') + ' · <b>LA</b> <i>' + esc(p.name_la || '—') + '</i></p>' +
         important.map(x => '<div class="alert">⚠ ' + esc(x) + '</div>').join('') +
@@ -183,6 +192,7 @@
       };
       const idn = root.querySelector('[data-k=idNote]');
       if (idn) idn.oninput = () => { p.idNote = idn.value; GP.save(); };
+      root.querySelector('[data-act=pickphoto]').onclick = () => GP.lookup.photoDialog(p, () => { GP.render(); GP.ui.toast(L('Fotka změněna ✓', 'Photo changed ✓')); });
       root.querySelector('[data-act=lookup]').onclick = () => GP.lookup.dialog(p, () => { GP.render(); GP.ui.toast(L('Doplněno ✓', 'Filled in ✓')); });
       root.querySelector('[data-act=save]').onclick = () => { GP.saveNow(); GP.ui.toast(L('Uloženo ✓', 'Saved ✓')); };
       root.querySelector('[data-act=del]').onclick = () => {
