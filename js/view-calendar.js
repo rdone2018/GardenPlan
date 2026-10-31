@@ -2,7 +2,7 @@
 (function (GP) {
   const L = GP.L, esc = GP.esc;
   const cal = { month: new Date().getMonth() + 1, garden: '', view: 'month' };
-  const CARE_ICONS = { fertilizing: '🧪', watering: '💧', pruning1: '✂️', pruning2: '✂️', winter: '❄️', pests: '🐛', otherCare: '🌱' };
+  const careFields = () => GP.PLANT_FIELDS.filter(f => f.type === 'care');
 
   // Everything that falls into month `m` (optionally for one garden).
   GP.monthAgenda = function (m, gardenId) {
@@ -14,13 +14,14 @@
       if (!p || !g) continue;
       if ((p.bloomMonths || []).includes(m)) bloom.set(p.id, p);
       if ((p.harvestMonths || []).includes(m)) harvest.set(p.id, p);
-      for (const f of GP.PLANT_FIELDS.filter(x => x.type === 'care')) {
-        const c = p[f.key];
-        if (!c || !(c.months || []).includes(m)) continue;
-        const key = 'care:' + g.id + ':' + p.id + ':' + f.key;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        tasks.push({ key, icon: CARE_ICONS[f.key] || '•', title: GP.fieldLabel(f) + ' – ' + GP.plantName(p), text: c.text, garden: g, href: '#/plant/' + p.id });
+      for (const f of careFields()) {
+        GP.careTerms(p, f.key).forEach((c, i) => {
+          if (!(c.months || []).includes(m)) return;
+          const key = 'care:' + g.id + ':' + p.id + ':' + f.key + (i ? ':' + i : '');
+          if (seen.has(key)) return;
+          seen.add(key);
+          tasks.push({ key, icon: f.icon || '•', title: GP.fieldLabel(f) + ' – ' + GP.plantName(p), text: c.text, garden: g, href: '#/plant/' + p.id });
+        });
       }
     }
     for (const e of GP.state.equipment) {
@@ -84,13 +85,12 @@
       html += '<tr><td class="nm"><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a></td>';
       for (let m = 1; m <= 12; m++) {
         const b = (p.bloomMonths || []).includes(m), h = (p.harvestMonths || []).includes(m);
-        const care = GP.PLANT_FIELDS.filter(f => f.type === 'care' && p[f.key] && (p[f.key].months || []).includes(m)).map(f => CARE_ICONS[f.key]).join('');
+        const care = careFields().filter(f => GP.careTerms(p, f.key).some(t => (t.months || []).includes(m))).map(f => f.icon).join('');
         html += '<td class="' + (m === now ? 'now' : '') + '"' + (b ? ' style="background:' + hex + '"' : '') + ' title="' + esc(GP.monthName(m)) + '">' + (h ? '🍎' : '') + '<span class="ci">' + care + '</span></td>';
       }
       html += '</tr>';
     }
-    return html + '</tbody></table></div><p class="small muted">' + L('Barva = kvete · 🍎 zrání · ', 'Colour = flowering · 🍎 ripening · ') + Object.entries(CARE_ICONS).filter(([k], i, a) => a.findIndex(x => x[1] === CARE_ICONS[k]) === i)
-      .map(([k, ic]) => ic + ' ' + GP.fieldLabel(GP.PLANT_FIELDS.find(f => f.key === k)).replace(/ 1$/, '')).join(' · ') + '</p>';
+    return html + '</tbody></table></div><p class="small muted">' + L('Barva = kvete · 🍎 zrání · ', 'Colour = flowering · 🍎 ripening · ') + careFields().map(f => f.icon + ' ' + GP.fieldLabel(f)).join(' · ') + '</p>';
   }
 
   GP.views.calendar = {

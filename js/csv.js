@@ -73,10 +73,14 @@
       const out = [];
       for (const f of fields) {
         const v = p[f.key];
-        if (f.type === 'care') { out.push(v ? v.text || '' : ''); out.push(v ? GP.formatMonths(v.months) : ''); }
+        if (f.type === 'care') {
+          const terms = GP.careTerms(p, f.key);
+          out.push(terms.map(t => t.text || '').filter(Boolean).join(' | '));
+          out.push(GP.formatMonths([...new Set(terms.flatMap(t => t.months || []))]));
+        }
         else if (f.type === 'months') out.push(GP.formatMonths(v || []));
-        else if (f.type === 'bool') out.push(v === true ? 'ano' : v === false ? 'ne' : '');
-        else if (f.type === 'select') out.push(GP.typeLabel(v));
+        else if (f.type === 'select') out.push(f.key === 'type' ? GP.typeLabel(v) : GP.optLabel(f.opts, v));
+        else if (f.type === 'multi') out.push((v || []).map(k => GP.optLabel(f.opts, k)).join(', '));
         else if (p.unsure && /^name_/.test(f.key) && v) out.push(v + ' ?'); // keeps "unidentified" on re-import
         else out.push(v || '');
       }

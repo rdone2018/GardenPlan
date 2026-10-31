@@ -7,7 +7,7 @@
     const opt = (v, label) => '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + esc(label) + '</option>';
     let html = opt('', '— ' + L('nepoužít', 'skip') + ' —');
     const groups = GP.groups();
-    for (let gi = 0; gi < 3; gi++) {
+    for (let gi = 0; gi < groups.length; gi++) {
       html += '<optgroup label="' + esc(groups[gi][0]) + '">';
       for (const f of GP.PLANT_FIELDS.filter(x => x.group === gi && x.type !== 'color')) {
         html += opt('plant:' + f.key, GP.fieldLabel(f));
@@ -70,9 +70,9 @@
         const headers = rows[0];
         imp = { file: f.name, headers, rows: rows.slice(1), map: headers.map(GP.csv.matchHeader), gardenId: GP.state.gardens.length === 1 ? GP.state.gardens[0].id : '',
           fillOnly: true, extraToNotes: true, splitNames: true };
-        // The same target twice -> keep only the first
-        const seen = new Set();
-        imp.map = imp.map.map(t => (t && seen.has(t) ? '' : (seen.add(t), t)));
+        // The same target twice -> keep only the first (care items and long texts may take several columns)
+        const seen = new Set(), multi = t => { const f = GP.plantField(t.replace(/^plant:/, '').split('.')[0]); return f && (f.type === 'care' || f.type === 'longtext'); };
+        imp.map = imp.map.map(t => (t && seen.has(t) && !multi(t) ? '' : (seen.add(t), t)));
         GP.render();
       };
       if (!imp || imp.result) return;
@@ -99,23 +99,26 @@
         if (kind === 'place') { place[path] = raw; return; }
         const [key, sub] = path.split('.');
         const f = fieldOf(key);
-        if (sub === 'months') {
-          data[key] = data[key] || {};
-          data[key].months = GP.parseMonths(raw);
-        } else if (f.type === 'care') {
-          data[key] = data[key] || {};
-          data[key].text = raw;
-        } else if (f.type === 'months') {
-          const ms = GP.parseMonths(raw);
-          if (ms.length) data[key] = ms;
-          else extra.push(GP.fieldLabel(f) + ': ' + raw); // e.g. "koncem léta" – keep the text
-        } else if (f.type === 'bool') {
-          const b = GP.parseBool(raw);
-          if (b !== '') data[key] = b; else extra.push(GP.fieldLabel(f) + ': ' + raw);
-        } else if (f.type === 'select') {
-          data[key] = GP.parseType(raw);
-          if (data[key] === 'other') extra.push(GP.fieldLabel(f) + ': ' + raw);
-        } else data[key] = raw;
+        if (f.type === 'care') {
+          // a care column fills the first term: its text, or its months ("– měsíce" column)
+          // ("Řez 1" + "Řez 2" -> two terms of Řez)
+          const terms = data[key] = data[key] || [];
+          if (sub === 'months') {
+            const t = terms.find(x => !x.months) || (terms.push({}), terms[terms.length - 1]);
+            t.months = GP.parseMonths(raw);
+          } else {
+            const t = terms.find(x => !x.text) || (terms.push({}), terms[terms.length - 1]);
+            t.text = raw;
+          }
+          return;
+        }
+        if (f.type === 'longtext' && data[key]) { data[key] += '\n' + raw; return; } // e.g. two columns mapped to notes
+        const v = GP.parseField(f, raw);
+        if (v === undefined) { extra.push(GP.fieldLabel(f) + ': ' + raw); return; } // e.g. "koncem léta" – keep the text
+        // sizes are stored in metres; a "(cm)" column or "cm" value is converted
+        data[key] = (key === 'height' || key === 'width') && /cm/.test(GP.norm(h + ' ' + raw)) ? GP.cmToM(raw.replace(/\s*cm\b/i, '')) : v;
+        if (key === 'type' && v === 'other') extra.push(GP.fieldLabel(f) + ': ' + raw);
+        if (key === 'hardiness' && !data.usda) data.usda = GP.usdaFromC(+v);
       });
       // "?" in a name = the exact species is not known: drop the "?" and flag the plant instead.
       const names = ['name_cs', 'name_sk', 'name_en', 'name_la'];
@@ -146,12 +149,7 @@
         for (const [k, v] of Object.entries(data)) {
           const f = fieldOf(k);
           if (!f) p[k] = v; // flags such as `unsure`
-          else if (f.type === 'care') {
-            const cur = p[k] || {};
-            if (v.text && (!imp.fillOnly || !cur.text)) cur.text = v.text;
-            if (v.months && v.months.length && (!imp.fillOnly || !(cur.months || []).length)) cur.months = v.months;
-            p[k] = cur;
-          } else if (k === 'notes' && p.notes && imp.fillOnly) {
+          else if (k === 'notes' && p.notes && imp.fillOnly) {
             if (!p.notes.includes(v)) p.notes += '\n' + v;
           } else if (!imp.fillOnly || !GP.isFilled(p, f)) p[k] = v;
         }

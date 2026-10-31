@@ -41,12 +41,12 @@
     if (!plant) return out;
     if (key) {
       const ci = cellInfo(g, key);
-      const want = GP.lightSet(plant.light);
+      const want = GP.lightSet(plant.light), O = GP.PLANT_OPTS;
       if (ci.light && want.size && !want.has(ci.light))
-        out.push('☀ ' + L('chce', 'needs') + ': ' + plant.light + ' · ' + L('políčko', 'cell') + ': ' + GP.optLabel(GP.CELL_LIGHT, ci.light));
-      const w = GP.norm(plant.water);
-      if ((ci.water === 'dry' && /vlhk|wet|moist/.test(w)) || (ci.water === 'wet' && /such|dry/.test(w)))
-        out.push('💧 ' + L('chce', 'needs') + ': ' + plant.water + ' · ' + L('políčko', 'cell') + ': ' + GP.optLabel(GP.CELL_WATER, ci.water));
+        out.push('☀ ' + L('chce', 'needs') + ': ' + [...want].map(k => GP.optLabel(O.light, k)).join(', ') + ' · ' + L('políčko', 'cell') + ': ' + GP.optLabel(GP.CELL_LIGHT, ci.light));
+      const w = plant.water;
+      if ((ci.water === 'dry' && (w === 'moist' || w === 'wet')) || (ci.water === 'wet' && w === 'dry'))
+        out.push('💧 ' + L('chce', 'needs') + ': ' + GP.optLabel(O.water, w) + ' · ' + L('políčko', 'cell') + ': ' + GP.optLabel(GP.CELL_WATER, ci.water));
       if (byCell && plant.antagonists) {
         const [c, r] = key.split(',').map(Number), bad = GP.norm(plant.antagonists), seen = new Set();
         for (let dc = -1; dc <= 1; dc++) for (let dr = -1; dr <= 1; dr++) {
@@ -60,9 +60,11 @@
       }
     }
     const min = parseFloat(String(g.minTemp || '').replace(/[−–]/g, '-').replace(',', '.'));
-    const hard = GP.hardinessC(plant.hardiness);
-    if (!isNaN(min) && hard != null && hard > min)
+    const hard = parseFloat(String(plant.hardiness == null ? '' : plant.hardiness).replace(/[−–]/g, '-').replace(',', '.'));
+    if (!isNaN(min) && !isNaN(hard) && hard > min)
       out.push('❄ ' + L('mrazuvzdornost', 'hardiness') + ' ' + Math.round(hard) + ' °C · ' + L('zahrada', 'garden') + ' ' + min + ' °C');
+    if (g.soilPh && plant.soilPh && GP.PH_OK[g.soilPh] && !GP.PH_OK[g.soilPh].includes(plant.soilPh))
+      out.push('🧪 ' + L('chce půdu', 'needs soil') + ': ' + GP.optLabel(GP.PLANT_OPTS.soilPh, plant.soilPh) + ' · ' + L('zahrada', 'garden') + ': ' + GP.optLabel(GP.SOIL_PH, g.soilPh));
     return out;
   };
 
@@ -494,10 +496,10 @@
         if (zc) style = 'background:' + zc;
       } else if (ui.mode === 'season') {
         const plants = pls.map(pl => GP.byId('plants', pl.plantId)).filter(Boolean);
-        const blooming = [...new Set(plants.filter(p => (p.bloomMonths || []).includes(ui.month)).map(GP.colorHex))];
+        const blooming = [...new Set(plants.filter(p => (p.bloomMonths || []).includes(ui.month)).map(p => GP.colorHex(p) || '#c9c3d6'))];
         if (blooming.length === 1) style = 'background:' + blooming[0];
         else if (blooming.length > 1) style = 'background:linear-gradient(135deg,' + blooming.map((h, i) => h + ' ' + Math.round(i * 100 / blooming.length) + '% ' + Math.round((i + 1) * 100 / blooming.length) + '%').join(',') + ')';
-        else if (plants.some(p => p.evergreen === true)) style = 'background:#4f7d45';
+        else if (plants.some(p => p.foliage === 'evergreen')) style = 'background:#4f7d45';
         else if (plants.length) style = 'background:#c9dbb8';
         else if (zc) style = 'background:' + zc + '40';
         if (plants.some(p => (p.harvestMonths || []).includes(ui.month))) content = '<i class="fruit">🍎</i>';
@@ -539,7 +541,7 @@
       const bloom = plants.filter(p => (p.bloomMonths || []).includes(ui.month));
       const harvest = plants.filter(p => (p.harvestMonths || []).includes(ui.month));
       const noData = plants.filter(p => !(p.bloomMonths || []).length).length;
-      const item = p => '<li>' + GP.ui.swatch(GP.colorHex(p)) + ' <a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a> <span class="muted small">' + esc(p.flowerColor || '') + '</span></li>';
+      const item = p => '<li>' + GP.ui.swatch(GP.colorHex(p)) + ' <a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a> <span class="muted small">' + esc(GP.colorNames(p)) + '</span></li>';
       return '<h3>' + esc(GP.monthName(ui.month)) + '</h3><h4>🌸 ' + L('Kvete', 'Flowering') + ' (' + bloom.length + ')</h4><ul class="plain">' + (bloom.map(item).join('') || '<li class="muted">—</li>') + '</ul>' +
         (harvest.length ? '<h4>🍎 ' + L('Zraje / sklizeň', 'Ripening / harvest') + '</h4><ul class="plain">' + harvest.map(item).join('') + '</ul>' : '') +
         '<p class="muted small">' + L('Barvy = barva květů. Tmavě zelená = stálezelené, světle zelená = bez květu.', 'Colours = flower colour. Dark green = evergreen, light green = not flowering.') + '</p>' +

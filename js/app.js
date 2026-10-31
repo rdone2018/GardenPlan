@@ -22,6 +22,8 @@
 
   GP.render = function () {
     const r = route();
+    // Plants saved with an older field set (also after restoring a backup) are converted once.
+    if (GP.state.plants.reduce((ch, p) => GP.migratePlant(p) || ch, false)) GP.save();
     document.documentElement.lang = GP.state.settings.lang;
 
     document.getElementById('nav').innerHTML = NAV.map(([path, icon, cs, en]) => {

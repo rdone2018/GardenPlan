@@ -4,7 +4,7 @@
   const filt = GP.plantFilter = { q: '', type: '', missing: '', garden: '', sort: 'name' };
 
   GP.newPlant = function (data) {
-    const p = Object.assign({ id: GP.uid(), created: new Date().toISOString().slice(0, 10) }, data || {});
+    const p = Object.assign({ id: GP.uid(), created: new Date().toISOString().slice(0, 10), v: GP.PLANT_VERSION }, data || {});
     GP.state.plants.push(p);
     GP.save();
     return p;
@@ -56,8 +56,8 @@
           '<td><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a><div class="italic small muted">' + esc(p.name_la) + '</div></td>' +
           '<td class="hide-sm">' + esc(GP.typeLabel(p.type)) + '</td>' +
           '<td>' + GP.ui.swatch(GP.colorHex(p)) + ' ' + esc(GP.formatMonths(p.bloomMonths)) + '</td>' +
-          '<td class="hide-sm">' + esc([p.height, p.heightMax ? 'max ' + p.heightMax + ' m' : ''].filter(Boolean).join(' · ')) + '</td>' +
-          '<td class="hide-sm">' + esc(p.light || '') + '</td>' +
+          '<td class="hide-sm">' + esc(p.height ? p.height + ' m' : '') + '</td>' +
+          '<td class="hide-sm">' + esc((p.light || []).map(k => GP.optLabel(GP.PLANT_OPTS.light, k).split(' ')[0]).join(' ')) + '</td>' +
           '<td class="hide-sm">' + (n || '') + '</td>' +
           '<td>' + GP.ui.bar(pct) + '</td></tr>';
       }).join('');
@@ -104,7 +104,9 @@
           L('Až druh zjistíte, doplňte latinský název a zrušte zaškrtnutí.', 'Once you know the species, fill in the Latin name and untick this.') + '</p>' +
           '<label class="field wide"><span class="lbl">' + L('Co o ní víme (vzhled, výška, kdy kvete, odkud je)', 'What we know (looks, height, flowering, where from)') + '</span>' +
           '<textarea data-k="idNote" rows="2">' + esc(p.idNote || '') + '</textarea></label>' : '') + '</div>';
-      const missing = GP.PLANT_FIELDS.filter(f => f.core && !GP.isFilled(p, f)).map(GP.fieldLabel);
+      const missing = GP.coreFields(p).filter(f => !GP.isFilled(p, f)).map(GP.fieldLabel);
+      // Lines in the notes starting with "!!!" are shown as a warning at the top.
+      const important = (p.notes || '').split('\n').filter(x => /^\s*!!!/.test(x)).map(x => x.replace(/^\s*!!!\s*/, ''));
       let html = '<div class="head"><h1><a href="#/plants" class="back">←</a> <span id="pname">' + esc(GP.plantName(p)) + '</span></h1>' +
         '<div class="row gap"><span id="pbar">' + GP.ui.bar(pct) + '</span><button class="btn primary" data-act="save">💾 ' + L('Uložit', 'Save') + '</button>' +
         '<button class="btn danger" data-act="del">' + L('Smazat', 'Delete') + '</button></div></div>' +
@@ -112,22 +114,40 @@
         '<label class="btn small">📷 ' + (p.photo ? L('Změnit foto', 'Change photo') : L('Přidat foto', 'Add photo')) + '<input type="file" accept="image/*" data-act="photo" hidden></label>' +
         (p.photo ? ' <button class="link small danger" data-act="nophoto">✕</button>' : '') + '</div>' +
         '<div class="grow"><p class="names"><b>CZ</b> ' + esc(p.name_cs || '—') + ' · <b>SK</b> ' + esc(p.name_sk || '—') + ' · <b>EN</b> ' + esc(p.name_en || '—') + ' · <b>LA</b> <i>' + esc(p.name_la || '—') + '</i></p>' +
-        (p.warning ? '<div class="alert">⚠ ' + esc(p.warning) + '</div>' : '') +
+        important.map(x => '<div class="alert">⚠ ' + esc(x) + '</div>').join('') +
         (missing.length ? '<p class="small muted">' + L('Chybí doplnit', 'Still missing') + ': ' + esc(missing.join(', ')) + '</p>' : '<p class="small ok-text">✓ ' + L('Hlavní údaje jsou kompletní', 'Main details are complete') + '</p>') +
         (p.unsure ? '' : web) + unsure + '</div></div><div id="pform">';
-      for (let gi = 0; gi < 3; gi++) {
-        html += '<details class="panel group" open><summary><h2>' + esc(groups[gi][0]) + '</h2><span class="muted small">' + esc(groups[gi][1]) + '</span></summary><div class="form">' +
-          GP.PLANT_FIELDS.filter(f => f.group === gi).map(f => GP.ui.field(f, p[f.key])).join('') + '</div></details>';
-      }
+      groups.forEach((g, gi) => {
+        html += '<details class="panel group" open><summary><h2>' + esc(g[0]) + '</h2><span class="muted small">' + esc(g[1]) + '</span></summary>' +
+          (gi === 3 ? '<div id="careform">' + careHtml(p) + '</div>' : groupHtml(p, gi)) + '</details>';
+      });
       html += '</div>' + plantingsPanel(p);
       return html;
     },
     mount(root, [id]) {
       const p = GP.byId('plants', id);
       if (!p) return;
-      GP.ui.bind(root.querySelector('#pform'), p, key => {
+      const form = root.querySelector('#pform');
+      const careRedraw = () => { form.querySelector('#careform').innerHTML = careHtml(p); };
+      GP.ui.bind(form, p, key => {
         if (/^name_|^cultivar/.test(key)) root.querySelector('#pname').textContent = GP.plantName(p);
+        // frost hardiness °C <-> USDA zone, whichever was typed last
+        if (key === 'hardiness') {
+          const c = parseFloat(String(p.hardiness).replace(/[−–]/g, '-').replace(',', '.'));
+          if (!isNaN(c)) { p.usda = GP.usdaFromC(c); form.querySelector('[data-k=usda]').value = p.usda; }
+        }
+        if (key === 'usda' && p.usda) { p.hardiness = String(GP.usdaToC(p.usda)); form.querySelector('[data-k=hardiness]').value = p.hardiness; }
+        if (key === 'maintenance') careRedraw();
         root.querySelector('#pbar').innerHTML = GP.ui.bar(GP.completeness(p));
+      });
+      form.addEventListener('click', e => {
+        const add = e.target.closest('[data-addterm]'), del = e.target.closest('[data-delterm]');
+        if (!add && !del) return;
+        const key = (add || del).dataset[add ? 'addterm' : 'delterm'];
+        const terms = GP.careTerms(p, key).slice();
+        if (add) { if (!terms.length) terms.push({}); terms.push({}); } else terms.splice(+del.dataset.i, 1);
+        p[key] = terms;
+        GP.save(); careRedraw();
       });
       root.querySelector('[data-act=unsure]').onchange = e => {
         if (e.target.checked) p.unsure = true; else delete p.unsure;
@@ -176,6 +196,34 @@
       });
     }
   };
+
+  // Fields of one section; sub-headings between blocks, the "side" fields in a block on the right.
+  function fieldsHtml(p, list) {
+    let prev = '', out = '';
+    for (const f of list) {
+      if (f.sub && f.sub !== prev) { out += '<h3 class="sub">' + esc(GP.subLabel(f.sub)) + '</h3>'; prev = f.sub; }
+      out += GP.ui.field(f, p[f.key]);
+    }
+    return out;
+  }
+  function groupHtml(p, gi) {
+    const fs = GP.PLANT_FIELDS.filter(f => f.group === gi), main = fs.filter(f => !f.side), side = fs.filter(f => f.side);
+    return '<div class="pgroup' + (side.length ? ' has-side' : '') + '"><div class="form' + (gi === 0 ? ' two' : '') + '">' + fieldsHtml(p, main) + '</div>' +
+      (side.length ? '<div class="form one sidebox">' + fieldsHtml(p, side) + '</div>' : '') + '</div>';
+  }
+  // Care: items ticked under "Needs maintenance" are open and marked, the others stay folded unless they hold data.
+  function careHtml(p) {
+    const maint = p.maintenance || [];
+    return GP.PLANT_FIELDS.filter(f => f.group === 3).map(f => {
+      if (f.type !== 'care') return '<div class="form">' + GP.ui.field(f, p[f.key]) + '</div>';
+      const expected = GP.careExpected(p, f), filled = GP.isFilled(p, f);
+      const open = !f.maint || expected || filled || !maint.length;
+      return '<details class="care-item' + (expected ? ' expected' : '') + '"' + (open ? ' open' : '') + '><summary><b>' + f.icon + ' ' + esc(GP.fieldLabel(f)) + '</b>' +
+        (expected && !filled ? ' <span class="tag todo">' + L('k vyplnění', 'to fill in') + '</span>' : '') +
+        (!open ? ' <span class="muted small">' + L('není zaškrtnuto v údržbě', 'not ticked under maintenance') + '</span>' : '') + '</summary>' +
+        GP.ui.field(f, p[f.key]) + '</details>';
+    }).join('');
+  }
 
   function plantingsPanel(p) {
     const pls = GP.state.placements.filter(x => x.plantId === p.id);

@@ -10,7 +10,10 @@
   GP.setPath = function (obj, path, value) {
     const keys = path.split('.'), last = keys.pop();
     let o = obj;
-    for (const k of keys) { if (o[k] == null || typeof o[k] !== 'object') o[k] = {}; o = o[k]; }
+    keys.forEach((k, i) => {
+      if (o[k] == null || typeof o[k] !== 'object') o[k] = /^\d+$/.test(keys[i + 1] || last) ? [] : {};
+      o = o[k];
+    });
     o[last] = value;
   };
 
@@ -34,13 +37,24 @@
         input = '<textarea id="' + id + '" data-k="' + path + '" rows="3">' + esc(value) + '</textarea>';
         return '<label class="field wide">' + label + input + '</label>';
       case 'care': {
-        const v = value || {};
-        return '<div class="field wide care">' + label +
-          '<textarea data-k="' + path + '.text" rows="3" placeholder="' + esc(L('Co a jak dělat…', 'What and how…')) + '">' + esc(v.text) + '</textarea>' +
-          '<div class="care-months"><span class="muted small">' + esc(L('Kdy:', 'When:')) + '</span>' + GP.ui.months(path + '.months', v.months) + '</div></div>';
+        // One care item = several terms, each with its own text and months.
+        const terms = Array.isArray(value) && value.length ? value : [value && !Array.isArray(value) ? value : {}];
+        return '<div class="care-terms" data-care="' + path + '">' + terms.map((t, i) => '<div class="term">' +
+          '<textarea data-k="' + path + '.' + i + '.text" rows="2" placeholder="' + esc(L('Co a jak dělat…', 'What and how…')) + '">' + esc(t.text) + '</textarea>' +
+          '<div class="care-months"><span class="muted small">' + esc(L('Kdy:', 'When:')) + '</span>' + GP.ui.months(path + '.' + i + '.months', t.months) +
+          (terms.length > 1 ? '<button type="button" class="link danger small" data-delterm="' + path + '" data-i="' + i + '">✕</button>' : '') + '</div></div>').join('') +
+          '<button type="button" class="link small" data-addterm="' + path + '">+ ' + L('další termín', 'another time') + '</button></div>';
       }
       case 'months':
         return '<div class="field wide">' + label + GP.ui.months(path, value) + '</div>';
+      case 'multi': {
+        const set = new Set(value || []);
+        return '<div class="field' + (f.wide || f.opts.length > 3 ? ' wide' : '') + '">' + label + '<div class="chips" data-multi="' + path + '">' +
+          f.opts.map(o => '<button type="button" class="chip' + (set.has(o[0]) ? ' on' : '') + '" data-v="' + o[0] + '">' +
+            (o[4] ? '<span class="sw" style="background:' + o[4] + '"></span> ' : '') + esc(L(o[1], o[2])) + '</button>').join('') + '</div></div>';
+      }
+      case 'num':
+        return '<label class="field">' + label + '<input type="text" inputmode="decimal" data-k="' + path + '" value="' + esc(value) + '"' + (f.hint ? ' placeholder="' + esc(f.hint) + '"' : '') + '></label>';
       case 'bool':
         return '<label class="field">' + label + '<select data-k="' + path + '" data-type="bool">' +
           '<option value=""' + (value !== true && value !== false ? ' selected' : '') + '>?</option>' +
@@ -48,7 +62,7 @@
           '<option value="0"' + (value === false ? ' selected' : '') + '>' + L('ne', 'no') + '</option></select></label>';
       case 'select':
         return '<label class="field">' + label + '<select data-k="' + path + '"><option value=""></option>' +
-          GP.PLANT_TYPES.map(t => '<option value="' + t[0] + '"' + (value === t[0] ? ' selected' : '') + '>' + esc(L(t[1], t[2])) + '</option>').join('') +
+          (f.opts || GP.PLANT_TYPES).map(t => '<option value="' + t[0] + '"' + (value === t[0] ? ' selected' : '') + '>' + esc(L(t[1], t[2])) + '</option>').join('') +
           '</select></label>';
       case 'color':
         return '<label class="field">' + label + '<span class="row"><input type="color" data-k="' + path + '" value="' + esc(value || '#cccccc') + '">' +
@@ -60,8 +74,8 @@
         return '<label class="field">' + label + '<input type="date" data-k="' + path + '" value="' + esc(value) + '"></label>';
       default: {
         const list = f.list ? '<datalist id="' + id + '_l">' + f.list.map(o => '<option value="' + esc(o) + '">').join('') + '</datalist>' : '';
-        return '<label class="field' + (f.italic ? ' italic' : '') + '">' + label + '<input type="text" data-k="' + path + '" value="' + esc(value) + '"' +
-          (f.list ? ' list="' + id + '_l"' : '') + '>' + list + '</label>';
+        return '<label class="field' + (f.italic ? ' italic' : '') + (f.wide ? ' wide' : '') + '">' + label + '<input type="text" data-k="' + path + '" value="' + esc(value) + '"' +
+          (f.list ? ' list="' + id + '_l"' : '') + (f.hint ? ' placeholder="' + esc(f.hint) + '"' : '') + '>' + list + '</label>';
       }
     }
   };
@@ -89,6 +103,18 @@
         btn.classList.toggle('on');
         const months = [...box.querySelectorAll('.m.on')].map(b => +b.dataset.m);
         GP.setPath(obj, path, months);
+        changed(path);
+        return;
+      }
+      const chip = e.target.closest('[data-multi] .chip');
+      if (chip) {
+        // "none" (žádná / nejedovatá) excludes every other choice and the other way round
+        const box = chip.closest('[data-multi]'), path = box.dataset.multi;
+        chip.classList.toggle('on');
+        if (chip.classList.contains('on')) box.querySelectorAll('.chip.on').forEach(c => {
+          if (c !== chip && (c.dataset.v === 'none' || chip.dataset.v === 'none')) c.classList.remove('on');
+        });
+        GP.setPath(obj, path, [...box.querySelectorAll('.chip.on')].map(c => c.dataset.v));
         changed(path);
         return;
       }
