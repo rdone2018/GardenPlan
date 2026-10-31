@@ -39,7 +39,10 @@
     const view = GP.views[ROUTES[r.name]];
     const page = document.createElement('div');
     page.className = 'page';
-    page.innerHTML = (GP.storageError ? '<div class="alert">' + L('Prohlížeč nepovolil ukládání dat – změny se neuloží. Zkuste jiný prohlížeč nebo spusťte serve.ps1.', 'The browser blocked data storage – changes will not be saved. Try another browser or run serve.ps1.') + '</div>' : '') +
+    page.innerHTML = (GP.offline ? '<div class="alert">⚠ ' + L('Nelze se připojit k serveru', 'Cannot reach the server') + (GP.serverError ? ' (' + GP.esc(GP.serverError) + ')' : '') + '. ' +
+      L('Zobrazuji poslední kopii uloženou v tomto prohlížeči. Změny se uloží sem a na server se odešlou, jakmile bude znovu dostupný (zkouším každých 10 s).',
+        'Showing the last copy saved in this browser. Changes are kept here and sent to the server as soon as it is back (retrying every 10 s).') + '</div>' : '') +
+      (GP.storageError ? '<div class="alert">' + L('Prohlížeč nepovolil ukládání dat – změny se neuloží. Zkuste jiný prohlížeč nebo spusťte serve.ps1.', 'The browser blocked data storage – changes will not be saved. Try another browser or run serve.ps1.') + '</div>' : '') +
       view.render(r.args);
     const app = document.getElementById('app');
     app.replaceChildren(page);

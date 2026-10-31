@@ -204,7 +204,7 @@
       root.querySelector('[data-act=photo]').onchange = async e => {
         const f = e.target.files[0];
         if (!f) return;
-        p.photo = await GP.ui.readImage(f, 900);
+        p.photo = await GP.ui.readImage(f, 600);
         delete p.photoCredit; delete p.photoPage;
         GP.saveNow(); GP.render();
       };

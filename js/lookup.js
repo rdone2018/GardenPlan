@@ -192,7 +192,7 @@
   };
   const setPhoto = async (p, ph) => {
     const blob = await (await fetch(ph.value)).blob();
-    p.photo = await GP.ui.readImage(blob, 900);
+    p.photo = await GP.ui.readImage(blob, 600);
     p.photoCredit = 'Wikimedia Commons' + (ph.credit ? ' – ' + ph.credit : '');
     p.photoPage = ph.page || '';
   };
@@ -296,7 +296,7 @@
       if (!v) continue;
       if (k === 'photo') {
         const blob = await (await fetch(v.value)).blob();
-        p.photo = await GP.ui.readImage(blob, 900);
+        p.photo = await GP.ui.readImage(blob, 600);
         p.photoCredit = 'Wikimedia Commons' + (v.credit ? ' – ' + v.credit : '');
         p.photoPage = v.page || '';
       } else p[k] = v.value;
