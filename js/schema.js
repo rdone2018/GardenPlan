@@ -71,30 +71,33 @@
   };
 
   // ---------- option lists: [key, cs, en, match regex (diacritics-free), colour] ----------
+  // Type = growth form and lifespan. Woody: tree, shrub, subshrub; herbaceous: the rest.
   GP.PLANT_TYPES = [
-    ['tree', 'Strom', 'Tree'], ['fruit', 'Ovocná dřevina', 'Fruit tree / bush'], ['shrub', 'Keř', 'Shrub'],
-    ['conifer', 'Jehličnan', 'Conifer'], ['climber', 'Popínavá', 'Climber'], ['perennial', 'Trvalka', 'Perennial'],
-    ['annual', 'Letnička', 'Annual'], ['bulb', 'Cibulovina', 'Bulb'], ['grass', 'Tráva', 'Grass'],
-    ['fern', 'Kapradina', 'Fern'], ['vegetable', 'Zelenina', 'Vegetable'], ['herb', 'Bylinka', 'Herb'],
-    ['aquatic', 'Vodní', 'Aquatic'], ['other', 'Jiné', 'Other']
+    ['tree', 'strom', 'tree'], ['shrub', 'keř', 'shrub'], ['subshrub', 'polokeř', 'subshrub'], ['perennial', 'trvalka', 'perennial'],
+    ['biennial', 'dvouletka', 'biennial'], ['annual', 'letnička', 'annual'], ['bulb', 'cibulovina', 'bulb / tuber']
   ];
+  GP.WOODY = ['tree', 'shrub', 'subshrub'];
+  // (order matters: "polokeř" must be tested before "keř")
   const TYPE_WORDS = {
-    tree: 'strom|stromy|tree', fruit: 'ovoc|fruit', shrub: 'ker|kere|kry|shrub|bush', conifer: 'jehlic|ihlic|conifer',
-    climber: 'popin|ovijav|climb', perennial: 'trvalk|perenn', annual: 'letnic|annual', bulb: 'cibul|hlizn|bulb',
-    grass: 'trav|grass', fern: 'kaprad|papra|fern', vegetable: 'zelenin|vegetab', herb: 'bylin|herb', aquatic: 'vodni|aquat'
+    subshrub: 'polok|kerik|subshrub', tree: 'strom|tree|jehlic|ihlic|conifer|ovocn', shrub: 'ker|kere|kry|shrub|bush|lian',
+    biennial: 'dvoulet|dvojroc|biennial', annual: 'letnic|jednolet|jednoroc|annual|zelenin|vegetab', bulb: 'cibul|hlizn|bulb|tuber',
+    perennial: 'trvalk|perenn|trav|grass|kaprad|papra|fern|vodni|aquat|bylin|herb'
   };
+  // Free text -> type key, '' when it cannot be told
   GP.parseType = function (v) {
     const s = GP.norm(v);
     if (!s) return '';
     for (const [k] of GP.PLANT_TYPES) if (s === k) return k;
     for (const [k, re] of Object.entries(TYPE_WORDS)) if (new RegExp(re).test(s)) return k;
-    return 'other';
+    return '';
   };
   GP.typeLabel = k => { const t = GP.PLANT_TYPES.find(x => x[0] === k); return t ? L(t[1], t[2]) : ''; };
 
   const O = GP.PLANT_OPTS = {
     purpose: [['useful', 'užitková', 'useful (crop)', 'uzit|uzitk|crop|edible|use'], ['ornamental', 'okrasná', 'ornamental', 'okras|ornam'],
       ['both', 'užitková i okrasná', 'useful and ornamental', 'obe|oboj|both']],
+    crop: [['fruit', 'ovoce', 'fruit', 'ovoc|fruit|ovocn'], ['vegetable', 'zelenina', 'vegetable', 'zelenin|vegetab'], ['herb', 'bylinka', 'herb', 'bylin|herb|koren']],
+    leafType: [['broadleaf', 'listnatá', 'broadleaf', 'listnat|broadleaf|listn'], ['conifer', 'jehličnatá', 'conifer (needles)', 'jehlic|ihlic|conifer|needle']],
     habit: [['upright', 'vzpřímený', 'upright', 'vzprim|upright'], ['columnar', 'sloupovitý', 'columnar', 'sloup|column|fastig'],
       ['rounded', 'kulovitý', 'rounded', 'kulov|round|globos'], ['spreading', 'rozložitý', 'spreading', 'rozloz|spread'],
       ['weeping', 'převislý', 'weeping', 'previs|weep|pendul'], ['bushy', 'keřovitý', 'bushy', 'kerov|bush'],
@@ -120,8 +123,10 @@
     scent: [['none', 'žádná', 'none', 'zadn|bez|none|no'], ['light', 'jemná', 'light', 'jemn|slab|light|mild|faint'], ['strong', 'intenzivní', 'strong', 'intenz|silna|vyrazn|strong']],
     fruit: [['edible', 'jedlý', 'edible', '^jedl|edible|^ano'], ['inedible', 'nejedlý', 'inedible', 'nejedl|inedib|^ne$']],
     light: [['sun', '☀ slunce', '☀ sun'], ['part', '⛅ polostín', '⛅ partial shade'], ['shade', '☁ stín', '☁ shade']],
-    water: [['dry', 'snese sucho', 'drought tolerant', 'such|dry|drought'], ['medium', 'střední', 'medium', 'stred|norm|medium|mirn|bezn'],
-      ['moist', 'vlhkomilná', 'likes moisture', 'vlhk|moist'], ['wet', 'snese i zamokření', 'tolerates waterlogging', 'zamok|bazin|wet|mokr|bog']],
+    // 0–3 drops, like the light buttons
+    water: [['dry', '🌵 snese sucho', '🌵 drought tolerant', 'such|dry|drought'], ['medium', '💧 mírně vlhká', '💧 moderately moist', 'stred|norm|medium|mirn|bezn'],
+      ['moist', '💧💧 vlhkomilná', '💧💧 likes moisture', 'vlhk|moist'], ['wet', '💧💧💧 snese i zamokření', '💧💧💧 tolerates waterlogging', 'zamok|bazin|wet|mokr|bog']],
+    yesno: [['yes', 'ano', 'yes', '^ano|^ane|^yes|^y$|^x$'], ['no', 'ne', 'no', '^ne$|^nie$|^no$|^n$']],
     soilType: [['sand', 'písčitá', 'sandy', 'pisc|pies|sand'], ['loam', 'hlinitá', 'loam', 'hlin|loam'], ['clay', 'jílovitá', 'clay', 'jil|clay'],
       ['humus', 'humózní', 'humus-rich', 'humoz|humus|organ'], ['any', 'nenáročná', 'any', 'nenaroc|any|jakakoli|kazd']],
     soilPh: [['acid', 'kyselá (pH pod 5,5)', 'acidic (pH below 5.5)', 'kysel|acid'], ['macid', 'mírně kyselá (pH 5,5–6,5)', 'slightly acidic (pH 5.5–6.5)', 'mirne kysel|slightly acid'],
@@ -152,9 +157,12 @@
   const F = (key, group, type, cs, en, aliases, extra) => Object.assign({ key, group, type, cs, en, aliases: aliases || [] }, extra || {});
   const SUB = {
     size: ['Velikost a tvar', 'Size and shape'], leaf: ['List', 'Leaves'], flower: ['Květ', 'Flower'], fruit: ['Plod', 'Fruit'],
-    needs: ['Požadavky rostliny', 'What the plant needs'], how: ['Jak se sází', 'How to plant'], nature: ['Jedovatost a příroda', 'Toxicity and wildlife']
+    needs: ['Požadavky rostliny', 'What the plant needs'], how: ['Jak se sází', 'How to plant'], nature: ['Jedovatost a příroda', 'Toxicity and wildlife'],
+    when: ['Kdy sázet a vysévat', 'When to plant and sow'], soil: ['🟫 Půda', '🟫 Soil'], frost: ['❄ Mráz', '❄ Frost']
   };
   GP.subLabel = k => (SUB[k] ? L(SUB[k][0], SUB[k][1]) : '');
+  // sowing only makes sense for herbaceous crops and short-lived plants
+  const sown = p => ['annual', 'biennial'].includes(p.type) || ['vegetable', 'herb'].includes(p.crop);
 
   GP.PLANT_FIELDS = [
     F('name_cs', 0, 'text', 'Český název', 'Czech name', ['cesky nazev', 'cz', 'cs', 'nazev', 'cesky'], { core: true }),
@@ -170,11 +178,18 @@
     F('link', 0, 'url', 'Odkaz', 'Link', ['odkaz', 'link', 'url', 'zdroj', 'eshop', 'web']),
     F('type', 0, 'select', 'Typ', 'Type', ['typ', 'type', 'druh', 'kategorie'], { core: true, side: true, opts: GP.PLANT_TYPES }),
     F('purpose', 0, 'select', 'Funkce', 'Purpose', ['funkcia', 'funkce', 'ucel', 'purpose', 'function', 'vyuziti'], { side: true, opts: O.purpose }),
+    F('crop', 0, 'select', 'Užitek', 'Crop', ['uzitek', 'uzitok', 'crop', 'produce'], { side: true, opts: O.crop, show: p => p.purpose === 'useful' || p.purpose === 'both' }),
+    F('toxicParts', 0, 'multi', 'Jedovatost – části', 'Toxicity – parts', ['jedovatost', 'jedovata', 'toxic', 'toxicity', 'poisonous'], { sub: 'nature', opts: O.toxicParts }),
+    F('toxicFor', 0, 'multi', 'Jedovatá pro', 'Toxic for', ['jedovata pro', 'toxic for'], { sub: 'nature', opts: O.toxicFor, show: p => (p.toxicParts || []).some(x => x !== 'none') }),
+    F('pollination', 0, 'select', 'Opylení', 'Pollination', ['opyleni', 'opelenie', 'samosprasnost', 'pollination'], { sub: 'nature', opts: O.pollination }),
+    F('pollinators', 0, 'text', 'Vhodní opylovači (odrůdy)', 'Suitable pollinators (cultivars)', ['opylovaci', 'opylovac', 'pollinators', 'pollinator'], { sub: 'nature' }),
+    F('wildlife', 0, 'multi', 'Přínos pro přírodu', 'Good for wildlife', ['prinos', 'vcely', 'wildlife', 'bees'], { sub: 'nature', opts: O.wildlife }),
 
-    F('height', 1, 'text', 'Výška v dospělosti (m)', 'Mature height (m)', ['vyska', 'vyska (m)', 'height', 'vyska v dospelosti', 'max vyska', 'max. vyska', 'max vyska (m)'], { core: true, sub: 'size', hint: 'např. 1,5–2' }),
-    F('width', 1, 'text', 'Šířka v dospělosti (m)', 'Mature width (m)', ['sirka', 'sirka (m)', 'width', 'sirka v dospelosti', 'max sirka', 'max. sirka', 'max sirka (m)'], { core: true, sub: 'size', hint: 'např. 1–1,5' }),
+    F('height', 1, 'text', 'Výška v dospělosti (cm)', 'Mature height (cm)', ['vyska', 'vyska (cm)', 'height', 'vyska v dospelosti', 'max vyska', 'max. vyska', 'height (cm)'], { core: true, sub: 'size', hint: 'např. 150–200' }),
+    F('width', 1, 'text', 'Šířka v dospělosti (cm)', 'Mature width (cm)', ['sirka', 'sirka (cm)', 'width', 'sirka v dospelosti', 'max sirka', 'max. sirka', 'width (cm)'], { core: true, sub: 'size', hint: 'např. 100–150' }),
     F('habit', 1, 'select', 'Tvar / habitus', 'Shape / habit', ['tvar', 'habitus', 'habit', 'shape'], { sub: 'size', opts: O.habit }),
     F('roots', 1, 'select', 'Kořenový systém', 'Root system', ['koren', 'korenovy system', 'roots', 'root system'], { sub: 'size', opts: O.roots }),
+    F('leafType', 1, 'select', 'Listnatá / jehličnatá', 'Broadleaf / conifer', ['listnata', 'jehlicnata', 'jehlicnan', 'leaf type', 'conifer'], { sub: 'leaf', opts: O.leafType }),
     F('foliage', 1, 'select', 'Stálezelená / opadavá', 'Evergreen / deciduous', ['stalezelena', 'stalezelene', 'stalezeleny', 'vzdyzelena', 'evergreen', 'opadava', 'olisteni'], { core: true, sub: 'leaf', opts: O.foliage }),
     F('leafColors', 1, 'multi', 'Barva listu', 'Leaf colour', ['barva listu', 'farba listov', 'leaf colour', 'leaf color', 'foliage colour'], { sub: 'leaf', opts: O.leafColors }),
     F('autumnColors', 1, 'multi', 'Podzimní zbarvení', 'Autumn colour', ['podzimni zbarveni', 'jesenne sfarbenie', 'autumn colour', 'autumn color', 'fall color'], { sub: 'leaf', opts: O.autumnColors }),
@@ -186,11 +201,11 @@
     F('harvestMonths', 1, 'months', 'Zrání / sklizeň', 'Ripening / harvest', ['zrenie', 'zrani', 'sklizen', 'zber', 'harvest', 'ripening', 'dozrava'], { sub: 'fruit' }),
 
     F('light', 2, 'multi', 'Světlo', 'Light', ['svetlo', 'light', 'stanoviste', 'expozice', 'slnko', 'sun'], { core: true, sub: 'needs', opts: O.light }),
-    F('water', 2, 'select', 'Voda', 'Water', ['voda', 'vlhkost', 'water', 'moisture', 'naroky na vodu', 'odolnost suchu'], { core: true, sub: 'needs', opts: O.water }),
-    F('soilType', 2, 'select', 'Půda – typ', 'Soil – type', ['puda', 'typ pudy', 'soil', 'soil type'], { sub: 'needs', opts: O.soilType }),
-    F('soilPh', 2, 'select', 'Půda – pH', 'Soil – pH', ['ph', 'ph pudy', 'soil ph'], { core: true, sub: 'needs', opts: O.soilPh }),
-    F('hardiness', 2, 'num', 'Mrazuvzdornost (°C)', 'Frost hardiness (°C)', ['mrazuvzdornost', 'mrazuvzdornost (°c)', 'mrazuvzdornost (c)', 'hardiness', 'odolnost'], { core: true, sub: 'needs', hint: 'např. -25' }),
-    F('usda', 2, 'select', 'Zóna USDA', 'USDA zone', ['usda', 'zona', 'zona odolnosti', 'zone', 'hardiness zone'], { sub: 'needs', opts: O.usda }),
+    F('water', 2, 'multi', 'Voda', 'Water', ['voda', 'vlhkost', 'water', 'moisture', 'naroky na vodu', 'odolnost suchu'], { core: true, sub: 'needs', opts: O.water, half: true }),
+    F('soilType', 2, 'select', 'Typ', 'Type', ['puda', 'typ pudy', 'soil', 'soil type'], { sub: 'needs', box: 'soil', opts: O.soilType }),
+    F('soilPh', 2, 'select', 'pH', 'pH', ['ph', 'ph pudy', 'soil ph'], { core: true, sub: 'needs', box: 'soil', opts: O.soilPh }),
+    F('hardiness', 2, 'num', 'Mrazuvzdornost (°C)', 'Frost hardiness (°C)', ['mrazuvzdornost', 'mrazuvzdornost (°c)', 'mrazuvzdornost (c)', 'hardiness', 'odolnost'], { core: true, sub: 'needs', box: 'frost', hint: 'např. -25' }),
+    F('usda', 2, 'select', 'Zóna USDA', 'USDA zone', ['usda', 'zona', 'zona odolnosti', 'zone', 'hardiness zone'], { sub: 'needs', box: 'frost', opts: O.usda }),
     F('companions', 2, 'longtext', 'Vhodní sousedé', 'Good neighbours', ['vhodni sousede', 'susedia', 'companions', 'good neighbours'], { sub: 'needs' }),
     F('antagonists', 2, 'longtext', 'Nevhodní sousedé', 'Bad neighbours', ['nevhodni sousede', 'bad neighbours', 'incompatible'], { sub: 'needs' }),
     F('maintenance', 2, 'multi', 'Vyžaduje údržbu', 'Needs maintenance', ['vyzaduje udrzbu', 'udrzba', 'narocnost', 'maintenance'], { core: true, sub: 'needs', wide: true, opts: O.maintenance }),
@@ -200,11 +215,12 @@
     F('growth', 2, 'select', 'Rychlost růstu', 'Growth rate', ['rychlost rustu', 'rust', 'growth', 'growth rate'], { sub: 'how', opts: O.growth }),
     F('growthCm', 2, 'num', 'Přírůstek (cm za rok)', 'Annual growth (cm / year)', ['prirustek', 'annual growth'], { sub: 'how' }),
     F('planting', 2, 'longtext', 'Poznámky k výsadbě', 'Planting notes', ['vysadba a substrat', 'vysadba', 'substrat', 'planting', 'pestovani', 'pestovanie', 'cultivation', 'growing'], { sub: 'how' }),
-    F('toxicParts', 2, 'multi', 'Jedovatost – části', 'Toxicity – parts', ['jedovatost', 'jedovata', 'toxic', 'toxicity', 'poisonous'], { sub: 'nature', opts: O.toxicParts }),
-    F('toxicFor', 2, 'multi', 'Jedovatá pro', 'Toxic for', ['jedovata pro', 'toxic for'], { sub: 'nature', opts: O.toxicFor }),
-    F('pollination', 2, 'select', 'Opylení', 'Pollination', ['opyleni', 'opelenie', 'samosprasnost', 'pollination'], { sub: 'nature', opts: O.pollination }),
-    F('pollinators', 2, 'text', 'Vhodní opylovači (odrůdy)', 'Suitable pollinators (cultivars)', ['opylovaci', 'opylovac', 'pollinators', 'pollinator'], { sub: 'nature' }),
-    F('wildlife', 2, 'multi', 'Přínos pro přírodu', 'Good for wildlife', ['prinos', 'vcely', 'wildlife', 'bees'], { sub: 'nature', opts: O.wildlife }),
+    F('plantMonths', 2, 'months', 'Výsadba ven (měsíce)', 'Planting out (months)', ['vysadba ven', 'kdy sadit', 'termin vysadby', 'planting time', 'plant out'], { sub: 'when', icon: '🪴', task: ['Sázet ven', 'Plant out'] }),
+    F('sowOutside', 2, 'select', 'Přímý výsev ven', 'Direct sowing outdoors', ['vysev ven', 'primy vysev', 'direct sowing'], { sub: 'when', opts: O.yesno, show: sown }),
+    F('sowOutMonths', 2, 'months', 'Výsev ven (měsíce)', 'Sowing outdoors (months)', ['vysev ven mesice', 'kdy vysevat ven', 'sow outdoors'], { sub: 'when', icon: '🌱', task: ['Vysévat ven', 'Sow outdoors'], show: p => sown(p) && p.sowOutside === 'yes' }),
+    F('sowInMonths', 2, 'months', 'Výsev doma – předpěstování (měsíce)', 'Sowing indoors (months)', ['vysev doma', 'predpestovani', 'vysev dnu', 'sow indoors'], { sub: 'when', icon: '🌱', task: ['Vysévat doma', 'Sow indoors'], show: sown }),
+    F('germDays', 2, 'num', 'Doba klíčení (dní)', 'Germination time (days)', ['doba kliceni', 'kliceni', 'germination'], { sub: 'when', show: sown }),
+    F('germTemp', 2, 'num', 'Optimální teplota klíčení (°C)', 'Germination temperature (°C)', ['teplota kliceni', 'germination temperature'], { sub: 'when', show: sown }),
 
     F('watering', 3, 'care', 'Zálivka', 'Watering', ['zalivka', 'zalievanie', 'watering'], { maint: 'water', icon: '💧' }),
     F('fertilizing', 3, 'care', 'Hnojení', 'Fertilising', ['hnojeni', 'hnojenie', 'fertilizing', 'fertilising', 'feeding'], { maint: 'fert', icon: '🧪' }),
@@ -263,7 +279,7 @@
     switch (f.type) {
       case 'months': { const ms = GP.parseMonths(raw); return ms.length ? ms : undefined; }
       case 'select': {
-        if (f.key === 'type') return GP.parseType(raw);
+        if (f.key === 'type') return GP.parseType(raw) || undefined;
         if (f.key === 'usda') { const n = s.match(/\d{1,2}/); return n && f.opts.some(o => o[0] === String(+n[0])) ? String(+n[0]) : undefined; }
         if (f.key === 'purpose' && /uzit|use/.test(s) && /okras|ornam/.test(s)) return 'both';
         const o = optMatch(f.opts, s);
@@ -292,18 +308,49 @@
   GP.usdaFromC = c => { const n = Math.floor((c + 51.1) / 5.56) + 1; return n >= 3 && n <= 10 ? String(n) : n < 3 ? '3' : '10'; };
   GP.usdaToC = z => Math.round(-51.1 + (+z - 1) * 5.56);
 
-  // Old cm values ("150", "30–50 cm") -> metres ("1,5", "0,3–0,5"); text that is not just numbers stays as it was.
-  const cmToM = GP.cmToM = function (v) {
-    const s = String(v || '').trim();
-    if (!s || (/m\b/.test(s) && !/cm/.test(s))) return s.replace(/\s*m$/, '');
-    if (!/^[\d\s.,–-]+(cm)?$/i.test(s)) return s;
-    return s.replace(/cm/i, '').trim().replace(/\d+(?:[.,]\d+)?/g, n => String(parseFloat(n.replace(',', '.')) / 100).replace('.', ',')).replace(/\s*-\s*/g, '–');
+  // Size text -> centimetres: "1,5–2 m" -> "150–200", "30–50 cm" -> "30–50"; plain numbers are read in `unit`.
+  // Text that is not just numbers stays as it was.
+  GP.toCm = function (v, unit) {
+    let s = String(v == null ? '' : v).trim();
+    if (!s) return s;
+    if (/cm\s*$/i.test(s)) { unit = 'cm'; s = s.replace(/\s*cm\s*$/i, ''); } else if (/m\s*$/i.test(s)) { unit = 'm'; s = s.replace(/\s*m\s*$/i, ''); }
+    if (!/^[\d\s.,–-]+$/.test(s)) return String(v).trim();
+    const k = unit === 'm' ? 100 : 1;
+    return s.replace(/\d+(?:[.,]\d+)?/g, n => String(Math.round(parseFloat(n.replace(',', '.')) * k * 10) / 10).replace('.', ',')).replace(/\s*[-–]\s*/g, '–');
   };
 
-  // Bring a plant stored with the older field set to the current one (idempotent, returns true when changed).
-  GP.PLANT_VERSION = 2;
+  // Bring a plant stored with an older field set to the current one (idempotent, returns true when changed).
+  GP.PLANT_VERSION = 3;
   GP.migratePlant = function (p) {
-    if ((p.v || 1) >= GP.PLANT_VERSION) return false;
+    const from = p.v || 1;
+    if (from >= GP.PLANT_VERSION) return false;
+    if (from < 2) migrate2(p);
+    else {
+      // version 2 kept sizes in metres (numbers over 60 were clearly typed in cm already)
+      const big = v => Math.max(0, ...(String(v || '').match(/\d+(?:[.,]\d+)?/g) || []).map(n => parseFloat(n.replace(',', '.')))) > 60;
+      for (const k of ['height', 'width']) if (p[k]) p[k] = GP.toCm(p[k], big(p[k]) ? 'cm' : 'm');
+    }
+    migrate3(p);
+    for (const k of ['height', 'width']) if (!p[k]) delete p[k];
+    p.v = GP.PLANT_VERSION;
+    return true;
+  };
+  // v3: type = growth form only; the rest moves to crop / leaf type / shape; water may hold several choices
+  function migrate3(p) {
+    const T = {
+      conifer: () => { p.type = 'tree'; p.leafType = p.leafType || 'conifer'; },
+      fruit: () => { p.type = 'tree'; p.crop = p.crop || 'fruit'; },
+      vegetable: () => { p.type = 'annual'; p.crop = p.crop || 'vegetable'; },
+      herb: () => { p.type = 'perennial'; p.crop = p.crop || 'herb'; },
+      grass: () => { p.type = 'perennial'; }, fern: () => { p.type = 'perennial'; }, aquatic: () => { p.type = 'perennial'; },
+      climber: () => { delete p.type; p.habit = p.habit || 'climbing'; }, other: () => { delete p.type; }
+    };
+    if (T[p.type]) T[p.type]();
+    if (p.crop && !p.purpose) p.purpose = 'useful';
+    if (typeof p.water === 'string') { if (p.water) p.water = [p.water]; else delete p.water; }
+  }
+  // v2: the 4-section field set (from the first version)
+  function migrate2(p) {
     const notes = [];
     const fld = GP.plantField;
     const toOpt = (key, raw, label) => {
@@ -316,8 +363,8 @@
     delete p.flowerColor; delete p.flowerHex;
     if (p.evergreen === true) p.foliage = 'evergreen'; else if (p.evergreen === false) p.foliage = 'deciduous';
     delete p.evergreen;
-    if (p.height) p.height = cmToM(p.height);
-    if (p.width) p.width = cmToM(p.width);
+    if (p.height) p.height = GP.toCm(p.height, 'cm');
+    if (p.width) p.width = GP.toCm(p.width, 'cm');
     if (p.heightMax) notes.push('Max. výška (m): ' + p.heightMax);
     if (p.widthMax) notes.push('Max. šířka (m): ' + p.widthMax);
     delete p.heightMax; delete p.widthMax;
@@ -354,9 +401,7 @@
     if (p.warning && p.warning.trim()) notes.unshift('!!! ' + p.warning.trim());
     delete p.warning;
     if (notes.length) p.notes = [notes.join('\n'), p.notes].filter(x => x && x.trim()).join('\n');
-    p.v = GP.PLANT_VERSION;
-    return true;
-  };
+  }
 
   // Flower colour shown on the plan / calendar: first chosen flower colour.
   GP.colorHex = function (plant) {

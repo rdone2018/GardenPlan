@@ -180,6 +180,9 @@ details.group:not([open]) > summary h2::before { content: "▸ "; }
 .form > h3.sub { grid-column: 1 / -1; margin: .5rem 0 -.2rem; padding-bottom: .2rem; border-bottom: 1px solid #eeebe1; font-size: .95rem; color: var(--green-2); }
 .form > h3.sub:first-child { margin-top: 0; }
 .chips .chip .sw { width: .8rem; height: .8rem; }
+.form > .boxes { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .7rem 1rem; }
+.fbox { background: #faf9f5; border: 1px solid #eeebe1; border-radius: 8px; padding: .6rem .8rem; display: flex; flex-direction: column; gap: .5rem; }
+.fbox-t { font-weight: 600; font-size: .9rem; }
 .care-item { border: 1px solid #eeebe1; border-radius: 8px; padding: .5rem .7rem; margin-bottom: .5rem; background: #fff; }
 .care-item.expected { border-color: var(--green-2); }
 .care-item > summary { cursor: pointer; }

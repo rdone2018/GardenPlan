@@ -3,6 +3,9 @@
   const L = GP.L, esc = GP.esc;
   const cal = { month: new Date().getMonth() + 1, garden: '', view: 'month' };
   const careFields = () => GP.PLANT_FIELDS.filter(f => f.type === 'care');
+  // month fields that are reminders too (planting out, sowing)
+  const taskFields = () => GP.PLANT_FIELDS.filter(f => f.task);
+  const taskShown = (p, f) => !f.show || f.show(p);
 
   // Everything that falls into month `m` (optionally for one garden).
   GP.monthAgenda = function (m, gardenId) {
@@ -14,6 +17,13 @@
       if (!p || !g) continue;
       if ((p.bloomMonths || []).includes(m)) bloom.set(p.id, p);
       if ((p.harvestMonths || []).includes(m)) harvest.set(p.id, p);
+      for (const f of taskFields()) {
+        if (!taskShown(p, f) || !(p[f.key] || []).includes(m)) continue;
+        const key = 'sow:' + g.id + ':' + p.id + ':' + f.key;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        tasks.push({ key, icon: f.icon, title: L(f.task[0], f.task[1]) + ' – ' + GP.plantName(p), garden: g, href: '#/plant/' + p.id });
+      }
       for (const f of careFields()) {
         GP.careTerms(p, f.key).forEach((c, i) => {
           if (!(c.months || []).includes(m)) return;
@@ -85,12 +95,13 @@
       html += '<tr><td class="nm"><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a></td>';
       for (let m = 1; m <= 12; m++) {
         const b = (p.bloomMonths || []).includes(m), h = (p.harvestMonths || []).includes(m);
-        const care = careFields().filter(f => GP.careTerms(p, f.key).some(t => (t.months || []).includes(m))).map(f => f.icon).join('');
+        const care = taskFields().filter(f => taskShown(p, f) && (p[f.key] || []).includes(m)).map(f => f.icon).join('') +
+          careFields().filter(f => GP.careTerms(p, f.key).some(t => (t.months || []).includes(m))).map(f => f.icon).join('');
         html += '<td class="' + (m === now ? 'now' : '') + '"' + (b ? ' style="background:' + hex + '"' : '') + ' title="' + esc(GP.monthName(m)) + '">' + (h ? '🍎' : '') + '<span class="ci">' + care + '</span></td>';
       }
       html += '</tr>';
     }
-    return html + '</tbody></table></div><p class="small muted">' + L('Barva = kvete · 🍎 zrání · ', 'Colour = flowering · 🍎 ripening · ') + careFields().map(f => f.icon + ' ' + GP.fieldLabel(f)).join(' · ') + '</p>';
+    return html + '</tbody></table></div><p class="small muted">' + L('Barva = kvete · 🍎 zrání · ', 'Colour = flowering · 🍎 ripening · ') + ['🪴 ' + L('výsadba ven', 'planting out'), '🌱 ' + L('výsev', 'sowing')].concat(careFields().map(f => f.icon + ' ' + GP.fieldLabel(f))).join(' · ') + '</p>';
   }
 
   GP.views.calendar = {

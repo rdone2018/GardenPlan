@@ -115,9 +115,8 @@
         if (f.type === 'longtext' && data[key]) { data[key] += '\n' + raw; return; } // e.g. two columns mapped to notes
         const v = GP.parseField(f, raw);
         if (v === undefined) { extra.push(GP.fieldLabel(f) + ': ' + raw); return; } // e.g. "koncem léta" – keep the text
-        // sizes are stored in metres; a "(cm)" column or "cm" value is converted
-        data[key] = (key === 'height' || key === 'width') && /cm/.test(GP.norm(h + ' ' + raw)) ? GP.cmToM(raw.replace(/\s*cm\b/i, '')) : v;
-        if (key === 'type' && v === 'other') extra.push(GP.fieldLabel(f) + ': ' + raw);
+        // sizes are stored in cm; a "(m)" column or "m" value is converted
+        data[key] = key === 'height' || key === 'width' ? GP.toCm(raw, /\(m\)|\bv m\b/.test(GP.norm(h)) ? 'm' : 'cm') : v;
         if (key === 'hardiness' && !data.usda) data.usda = GP.usdaFromC(+v);
       });
       // "?" in a name = the exact species is not known: drop the "?" and flag the plant instead.

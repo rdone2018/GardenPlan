@@ -56,7 +56,7 @@
           '<td><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a><div class="italic small muted">' + esc(p.name_la) + '</div></td>' +
           '<td class="hide-sm">' + esc(GP.typeLabel(p.type)) + '</td>' +
           '<td>' + GP.ui.swatch(GP.colorHex(p)) + ' ' + esc(GP.formatMonths(p.bloomMonths)) + '</td>' +
-          '<td class="hide-sm">' + esc(p.height ? p.height + ' m' : '') + '</td>' +
+          '<td class="hide-sm">' + esc(p.height ? p.height + ' cm' : '') + '</td>' +
           '<td class="hide-sm">' + esc((p.light || []).map(k => GP.optLabel(GP.PLANT_OPTS.light, k).split(' ')[0]).join(' ')) + '</td>' +
           '<td class="hide-sm">' + (n || '') + '</td>' +
           '<td>' + GP.ui.bar(pct) + '</td></tr>';
@@ -138,6 +138,8 @@
         }
         if (key === 'usda' && p.usda) { p.hardiness = String(GP.usdaToC(p.usda)); form.querySelector('[data-k=hardiness]').value = p.hardiness; }
         if (key === 'maintenance') careRedraw();
+        // fields shown only for some choices (crop, sowing, toxic for…) -> redraw the card where it was
+        if (['type', 'purpose', 'crop', 'sowOutside', 'toxicParts'].includes(key)) { const y = scrollY; GP.render(); scrollTo(0, y); return; }
         root.querySelector('#pbar').innerHTML = GP.ui.bar(GP.completeness(p));
       });
       form.addEventListener('click', e => {
@@ -198,12 +200,22 @@
   };
 
   // Fields of one section; sub-headings between blocks, the "side" fields in a block on the right.
+  // Fields with `box` (soil, frost) that follow each other become small boxes side by side.
   function fieldsHtml(p, list) {
-    let prev = '', out = '';
+    let prev = '', out = '', boxes = null;
+    const flush = () => {
+      if (!boxes) return;
+      out += '<div class="boxes">' + Object.entries(boxes).map(([b, html]) => '<div class="fbox"><div class="fbox-t">' + esc(GP.subLabel(b)) + '</div>' + html + '</div>').join('') + '</div>';
+      boxes = null;
+    };
     for (const f of list) {
-      if (f.sub && f.sub !== prev) { out += '<h3 class="sub">' + esc(GP.subLabel(f.sub)) + '</h3>'; prev = f.sub; }
+      if (f.show && !f.show(p)) continue;
+      if (f.sub && f.sub !== prev) { flush(); out += '<h3 class="sub">' + esc(GP.subLabel(f.sub)) + '</h3>'; prev = f.sub; }
+      if (f.box) { boxes = boxes || {}; boxes[f.box] = (boxes[f.box] || '') + GP.ui.field(f, p[f.key]); continue; }
+      flush();
       out += GP.ui.field(f, p[f.key]);
     }
+    flush();
     return out;
   }
   function groupHtml(p, gi) {

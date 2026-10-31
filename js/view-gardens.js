@@ -44,9 +44,10 @@
       const want = GP.lightSet(plant.light), O = GP.PLANT_OPTS;
       if (ci.light && want.size && !want.has(ci.light))
         out.push('☀ ' + L('chce', 'needs') + ': ' + [...want].map(k => GP.optLabel(O.light, k)).join(', ') + ' · ' + L('políčko', 'cell') + ': ' + GP.optLabel(GP.CELL_LIGHT, ci.light));
-      const w = plant.water;
-      if ((ci.water === 'dry' && (w === 'moist' || w === 'wet')) || (ci.water === 'wet' && w === 'dry'))
-        out.push('💧 ' + L('chce', 'needs') + ': ' + GP.optLabel(O.water, w) + ' · ' + L('políčko', 'cell') + ': ' + GP.optLabel(GP.CELL_WATER, ci.water));
+      // which plant water choices suit a dry / wet cell
+      const w = [].concat(plant.water || []), fits = { dry: ['dry', 'medium'], wet: ['moist', 'wet'] }[ci.water];
+      if (fits && w.length && !w.some(x => fits.includes(x)))
+        out.push('💧 ' + L('chce', 'needs') + ': ' + w.map(x => GP.optLabel(O.water, x)).join(', ') + ' · ' + L('políčko', 'cell') + ': ' + GP.optLabel(GP.CELL_WATER, ci.water));
       if (byCell && plant.antagonists) {
         const [c, r] = key.split(',').map(Number), bad = GP.norm(plant.antagonists), seen = new Set();
         for (let dc = -1; dc <= 1; dc++) for (let dr = -1; dr <= 1; dr++) {

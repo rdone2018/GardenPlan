@@ -49,7 +49,7 @@
         return '<div class="field wide">' + label + GP.ui.months(path, value) + '</div>';
       case 'multi': {
         const set = new Set(value || []);
-        return '<div class="field' + (f.wide || f.opts.length > 3 ? ' wide' : '') + '">' + label + '<div class="chips" data-multi="' + path + '">' +
+        return '<div class="field' + (f.wide || (!f.half && f.opts.length > 3) ? ' wide' : '') + '">' + label + '<div class="chips" data-multi="' + path + '">' +
           f.opts.map(o => '<button type="button" class="chip' + (set.has(o[0]) ? ' on' : '') + '" data-v="' + o[0] + '">' +
             (o[4] ? '<span class="sw" style="background:' + o[4] + '"></span> ' : '') + esc(L(o[1], o[2])) + '</button>').join('') + '</div></div>';
       }
