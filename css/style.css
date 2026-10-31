@@ -203,6 +203,7 @@ details.group:not([open]) > summary h2::before { content: "▸ "; }
 
 /* garden details */
 .saved { font-size: .8rem; color: #d7ead0; white-space: nowrap; }
+.saved.warn { color: #ffd98a; font-weight: 600; }
 .garden-info { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
 .form.one { grid-template-columns: 1fr; }
 .dims input { width: 7.5rem; flex: none; }
@@ -248,4 +249,5 @@ input.num { width: 4.5rem; }
   .water-row { grid-template-columns: 1fr auto; }
   .water-row input { grid-column: 1; }
   .saved { display: none; }
+  .saved.warn { display: inline; }
 }

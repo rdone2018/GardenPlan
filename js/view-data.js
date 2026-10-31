@@ -6,7 +6,9 @@
     render() {
       const size = Math.round(JSON.stringify(GP.state).length / 1024);
       return '<div class="head"><h1>' + L('Data a zálohy', 'Data & backups') + '</h1></div>' +
-        '<div class="panel"><p>' + L('Data se ukládají v tomto prohlížeči na tomto počítači. Pravidelně si stáhněte zálohu – soubor můžete nahrát zpět nebo přenést do jiného prohlížeče či počítače.', 'Data is stored in this browser on this computer. Download a backup regularly – you can restore it later or move it to another browser or computer.') + '</p>' +
+        '<div class="panel"><p>' + (GP.storageMode === 'server'
+          ? '🗄️ ' + L('Data se ukládají do databáze <b>MariaDB</b> na serveru – stejná data vidíte z každého zařízení. Záloha do souboru se přesto hodí.', 'Data is stored in the <b>MariaDB</b> database on the server – every device sees the same data. A file backup is still useful.')
+          : '💻 ' + L('Data se ukládají jen <b>v tomto prohlížeči</b> (aplikace neběží přes server s databází). Pravidelně si stáhněte zálohu. Do databáze je přenesete tak, že zálohu nahrajete v aplikaci otevřené ze serveru.', 'Data is stored only <b>in this browser</b> (the app is not running through the database server). Download backups regularly. To move them into the database, restore the backup in the app opened from the server.')) + '</p>' +
         '<p class="muted small">' + L('Velikost dat', 'Data size') + ': ' + size + ' kB · ' + GP.state.plants.length + ' ' + L('rostlin', 'plants') + ' · ' + GP.state.gardens.length + ' ' + L('zahrad', 'gardens') + '</p>' +
         '<div class="row gap"><button class="btn primary" data-act="backup">⬇ ' + L('Stáhnout zálohu (JSON)', 'Download backup (JSON)') + '</button>' +
         '<label class="btn">⬆ ' + L('Obnovit ze zálohy', 'Restore from backup') + '<input type="file" accept=".json,application/json" data-act="restore" hidden></label>' +
@@ -25,15 +27,19 @@
         try { data = JSON.parse(await f.text()); } catch (err) { return GP.ui.toast(L('Soubor není platná záloha', 'Not a valid backup file')); }
         if (!data || !Array.isArray(data.plants) || !Array.isArray(data.gardens)) return GP.ui.toast(L('Soubor není záloha GardenPlan', 'Not a GardenPlan backup'));
         if (!confirm(L('Nahradit všechna současná data obsahem zálohy?', 'Replace all current data with the backup?'))) return;
-        GP.replaceState(data);
-        GP.ui.toast(L('Záloha obnovena', 'Backup restored'));
+        try {
+          await GP.replaceState(data);
+          GP.ui.toast(L('Záloha obnovena', 'Backup restored'));
+        } catch (err) { alert(err.message); }
         GP.go('');
+        GP.render();
       };
-      root.querySelector('[data-act=wipe]').onclick = () => {
+      root.querySelector('[data-act=wipe]').onclick = async () => {
         if (!confirm(L('Opravdu smazat všechny zahrady, rostliny a úkoly?', 'Really delete all gardens, plants and tasks?'))) return;
-        GP.replaceState({ settings: GP.state.settings });
+        try { await GP.replaceState({ settings: GP.state.settings }); } catch (err) { alert(err.message); }
         if (GP.resetImport) GP.resetImport();
         GP.go('');
+        GP.render();
       };
     }
   };

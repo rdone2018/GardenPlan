@@ -2,7 +2,11 @@
 Planning and monitoring garden – plánování a správa zahrady (CZ / EN).
 
 ## Spuštění / How to run
-Nothing to install. Either:
+**With the database (recommended):** run `server/` on a Raspberry Pi / Linux with Node.js and MariaDB –
+data is stored in the MariaDB database `gardenplan` and the app is available from any device at home.
+See [server/README.md](server/README.md).
+
+**Without a server:** nothing to install. Either:
 
 - **Double-click `index.html`** – opens in your browser, or
 - run the small local server (recommended – same address every time):
@@ -40,7 +44,8 @@ are different storage places – pick one. Use **Data → Download backup** regu
 - `index.html`, `css/style.css`
 - `js/store.js` – storage · `js/schema.js` – field definitions (add plant fields here) · `js/csv.js` – CSV
 - `js/view-*.js` – screens · `js/app.js` – router
-- `serve.ps1` – local web server
+- `serve.ps1` – local static web server for Windows (browser storage only)
+- `server/` – Node.js server + MariaDB storage (`server.js`, `schema.sql`, `.env.example`, systemd unit)
 
 ## Ideas for next versions
 Costs & budget per year, contacts DB (gardeners, architects, technicians), harvest log & reports, photo diary,

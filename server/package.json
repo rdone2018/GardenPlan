@@ -1,0 +1,17 @@
+{
+  "name": "gardenplan-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GardenPlan web server: serves the app and stores data in MariaDB",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "mariadb": "^3.4.0"
+  }
+}
