@@ -138,6 +138,8 @@
         }
         if (key === 'usda' && p.usda) { p.hardiness = String(GP.usdaToC(p.usda)); form.querySelector('[data-k=hardiness]').value = p.hardiness; }
         if (key === 'maintenance') careRedraw();
+        // a crop makes the plant useful (ornamental -> both)
+        if (key === 'crop' && p.crop && p.purpose !== 'useful' && p.purpose !== 'both') p.purpose = p.purpose === 'ornamental' ? 'both' : 'useful';
         // fields shown only for some choices (crop, sowing, toxic for…) -> redraw the card where it was
         if (['type', 'purpose', 'crop', 'sowOutside', 'toxicParts'].includes(key)) { const y = scrollY; GP.render(); scrollTo(0, y); return; }
         root.querySelector('#pbar').innerHTML = GP.ui.bar(GP.completeness(p));

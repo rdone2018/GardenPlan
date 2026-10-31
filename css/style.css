@@ -183,6 +183,8 @@ details.group:not([open]) > summary h2::before { content: "▸ "; }
 .form > .boxes { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .7rem 1rem; }
 .fbox { background: #faf9f5; border: 1px solid #eeebe1; border-radius: 8px; padding: .6rem .8rem; display: flex; flex-direction: column; gap: .5rem; }
 .fbox-t { font-weight: 600; font-size: .9rem; }
+.field.span2 { grid-column: span 2; }
+.field.span2 .chips { flex-wrap: nowrap; }
 .care-item { border: 1px solid #eeebe1; border-radius: 8px; padding: .5rem .7rem; margin-bottom: .5rem; background: #fff; }
 .care-item.expected { border-color: var(--green-2); }
 .care-item > summary { cursor: pointer; }
@@ -278,6 +280,8 @@ input.num { width: 4.5rem; }
   .side { position: static; max-height: none; order: 2; }
   .dash { grid-template-columns: 1fr; }
   .pgroup.has-side { grid-template-columns: 1fr; }
+  .field.span2 { grid-column: 1 / -1; }
+  .field.span2 .chips { flex-wrap: wrap; }
   .garden-info { grid-template-columns: 1fr; }
   .filters { grid-template-columns: 1fr 1fr; }
   .filters input { grid-column: 1 / -1; }
