@@ -456,11 +456,11 @@
     if (!pls.length) return '<div class="empty"><p>' + L('V zahradě zatím nejsou rostliny. Přidejte je v plánu (vyberte rostlinu a klikněte do mřížky), na kartě rostliny, nebo při importu CSV.', 'No plants in this garden yet. Add them on the plan (pick a plant, click the grid), from a plant card, or during CSV import.') + '</p></div>';
     // tick rows to set the date / status of many plants at once
     const bulk = '<div class="row gap list-tools" data-bulk><span class="small"><b data-n>0</b> ' + L('vybráno', 'selected') + '</span>' +
-      '<label class="small">' + L('Vysazeno dne', 'Planted on') + ' <input type="date" data-bd></label><button class="btn small" data-act="bdate" disabled>' + L('Nastavit vybraným', 'Set for selected') + '</button>' +
+      '<label class="small">' + L('Vysazeno v měsíci', 'Planted in') + ' <input type="month" data-bd placeholder="RRRR-MM"></label><button class="btn small" data-act="bdate" disabled>' + L('Nastavit vybraným', 'Set for selected') + '</button>' +
       '<label class="small">' + L('Stav', 'Status') + ' <select data-bs>' + GP.STATUSES.map(s => '<option value="' + s[0] + '"' + (s[0] === 'planted' ? ' selected' : '') + '>' + esc(L(s[1], s[2])) + '</option>').join('') + '</select></label>' +
       '<button class="btn small" data-act="bstatus" disabled>' + L('Nastavit vybraným', 'Set for selected') + '</button>' +
       '<button class="link small danger" data-act="bremove" disabled>✕ ' + L('Odebrat ze zahrady', 'Remove from garden') + '</button></div>';
-    return bulk + '<div class="panel"><table class="tbl"><thead><tr><th class="pick"><input type="checkbox" data-pickall title="' + L('Vybrat vše', 'Select all') + '"></th><th>' + L('Rostlina', 'Plant') + '</th><th>' + L('Umístění', 'Position') + '</th><th>' + L('Na plánu', 'On plan') + '</th><th>' + L('Stav', 'Status') + '</th><th>' + L('Vysazeno dne', 'Planted on') + '</th><th>' + L('Ks', 'Qty') + '</th><th>' + L('Upozornění', 'Warnings') + '</th></tr></thead><tbody>' +
+    return bulk + '<div class="panel"><table class="tbl"><thead><tr><th class="pick"><input type="checkbox" data-pickall title="' + L('Vybrat vše', 'Select all') + '"></th><th>' + L('Rostlina', 'Plant') + '</th><th>' + L('Umístění', 'Position') + '</th><th>' + L('Na plánu', 'On plan') + '</th><th>' + L('Stav', 'Status') + '</th><th>' + L('Vysazeno v měsíci', 'Planted in') + '</th><th>' + L('Ks', 'Qty') + '</th><th>' + L('Upozornění', 'Warnings') + '</th></tr></thead><tbody>' +
       pls.map(pl => {
         const p = GP.byId('plants', pl.plantId);
         const issues = [...new Set((pl.cells && pl.cells.length ? pl.cells : [null]).flatMap(k => GP.plantIssues(p, g, k, byCell)))];
@@ -468,7 +468,7 @@
           '<td><input type="text" data-k="position" value="' + esc(pl.position) + '"></td>' +
           '<td class="small">' + (pl.cells && pl.cells.length ? pl.cells.slice(0, 6).map(GP.cellName).join(', ') + (pl.cells.length > 6 ? '…' : '') : '<span class="tag warn">' + L('neumístěno', 'not placed') + '</span>') + '</td>' +
           '<td><select data-k="status">' + GP.STATUSES.map(s => '<option value="' + s[0] + '"' + (pl.status === s[0] ? ' selected' : '') + '>' + esc(L(s[1], s[2])) + '</option>').join('') + '</select></td>' +
-          '<td><input type="date" data-k="plantedDate" value="' + esc(pl.plantedDate) + '"></td>' +
+          '<td><input type="month" data-k="plantedDate" placeholder="RRRR-MM" value="' + esc((pl.plantedDate || '').slice(0, 7)) + '"></td>' +
           '<td><input type="text" class="num" data-k="count" value="' + esc(pl.count) + '"></td>' +
           '<td class="small warn-text">' + issues.map(esc).join('<br>') + '</td></tr>';
       }).join('') + '</tbody></table></div>';
