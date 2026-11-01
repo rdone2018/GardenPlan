@@ -340,3 +340,10 @@ input.num { width: 4.5rem; }
 .unsent-list { display: flex; flex-direction: column; gap: .35rem; margin: .6rem 0 .8rem; max-height: 22rem; overflow: auto; }
 .unsent-list label { align-items: center; }
 .unsent-list img { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; }
+
+/* plant catalog: a filter above each column */
+.list-tools { justify-content: space-between; margin-bottom: .5rem; }
+.tbl tr.filter-row th { padding: .3rem .35rem; background: #f3f1ea; }
+.tbl tr.filter-row select, .tbl tr.filter-row input { width: 100%; min-width: 5.5rem; font-size: .78rem; padding: .2rem .3rem; font-weight: 400; }
+.tbl tr.filter-row input { min-width: 9rem; }
+.tbl tr.filter-row select.on { border-color: var(--accent, #3e7b3a); background: #eef5e8; font-weight: 600; }

@@ -1,7 +1,7 @@
 // Plant catalog (shared by all gardens) and the plant card: 0 basics, 1 before planting, 2 care, plus plantings.
 (function (GP) {
   const L = GP.L, esc = GP.esc;
-  const filt = GP.plantFilter = { q: '', type: '', purpose: '', crop: '', missing: '', garden: '', sort: 'name' };
+  const filt = GP.plantFilter = { q: '', type: '', purpose: '', crop: '', color: '', missing: '', garden: '', sort: 'name' };
 
   GP.newPlant = function (data) {
     const p = Object.assign({ id: GP.uid(), created: new Date().toISOString().slice(0, 10), v: GP.PLANT_VERSION }, data || {});
@@ -18,6 +18,7 @@
       // "useful and ornamental" plants show under both "useful" and "ornamental"
       if (filt.purpose === '_none' ? p.purpose : filt.purpose && p.purpose !== filt.purpose && p.purpose !== 'both') return false;
       if (filt.crop && (p.crop || '') !== (filt.crop === '_none' ? '' : filt.crop)) return false;
+      if (filt.color && !(p.flowerColors || []).includes(filt.color)) return false;
       if (filt.missing === '_any' && GP.completeness(p) === 100) return false;
       if (filt.missing === '_unsure' && !p.unsure) return false;
       if (filt.missing && filt.missing[0] !== '_' &&GP.isFilled(p, GP.PLANT_FIELDS.find(f => f.key === filt.missing))) return false;
@@ -69,16 +70,22 @@
         return head + '<div class="empty"><p>' + L('Katalog je prázdný. Importujte svůj seznam z Excelu (uložit jako CSV), nebo přidejte rostlinu ručně. Stačí název – zbytek doplníme postupně.', 'The catalog is empty. Import your list from Excel (save as CSV), or add a plant by hand. A name is enough – the rest can be filled in over time.') + '</p>' +
           '<p><a class="btn primary" href="#/import">⬆ ' + L('Importovat CSV', 'Import CSV') + '</a></p></div>';
       }
-      const filters = '<div class="filters"><input type="search" data-f="q" placeholder="' + L('Hledat v názvech (CZ/SK/EN/latinsky)…', 'Search names (CZ/SK/EN/Latin)…') + '" value="' + esc(filt.q) + '">' +
-        '<select data-f="type">' + opt('', L('Všechny typy', 'All types'), filt.type) + GP.PLANT_TYPES.map(t => opt(t[0], L(t[1], t[2]), filt.type)).join('') + '</select>' +
-        '<select data-f="purpose">' + opt('', L('Všechny funkce', 'Any purpose'), filt.purpose) + GP.PLANT_OPTS.purpose.map(o => opt(o[0], L(o[1], o[2]), filt.purpose)).join('') + opt('_none', L('Funkce nevyplněna', 'Purpose not set'), filt.purpose) + '</select>' +
-        '<select data-f="crop">' + opt('', L('Jakýkoli užitek', 'Any crop'), filt.crop) + GP.PLANT_OPTS.crop.map(o => opt(o[0], L(o[1], o[2]), filt.crop)).join('') + opt('_none', L('Bez užitku', 'No crop'), filt.crop) + '</select>' +
-        '<select data-f="garden">' + opt('', L('Všechny zahrady', 'All gardens'), filt.garden) + GP.state.gardens.map(g => opt(g.id, g.name, filt.garden)).join('') + '</select>' +
-        '<select data-f="missing">' + opt('', L('Vše', 'All'), filt.missing) + opt('_any', L('Nekompletní', 'Incomplete'), filt.missing) +
-        opt('_unsure', L('Neurčené (?)', 'Unidentified (?)') + ' · ' + all.filter(p => p.unsure).length, filt.missing) +
-        GP.PLANT_FIELDS.filter(f => f.core).map(f => opt(f.key, L('Chybí: ', 'Missing: ') + GP.fieldLabel(f), filt.missing)).join('') + '</select>' +
-        '<select data-f="sort">' + opt('name', L('Řadit: název', 'Sort: name'), filt.sort) + opt('latin', L('Řadit: latinsky', 'Sort: Latin'), filt.sort) +
-        opt('bloom', L('Řadit: doba květu', 'Sort: flowering'), filt.sort) + opt('complete', L('Řadit: vyplněnost', 'Sort: completeness'), filt.sort) + '</select></div>';
+      // filters sit in the table header, each one above the column it filters
+      const sel = (f, html) => '<select data-f="' + f + '"' + (filt[f] ? ' class="on"' : '') + '>' + html + '</select>';
+      const filterRow = '<tr class="filter-row"><th></th>' +
+        '<th><input type="search" data-f="q" placeholder="' + L('Hledat v názvech…', 'Search names…') + '" title="' + L('Česky, slovensky, anglicky i latinsky', 'Czech, Slovak, English or Latin') + '" value="' + esc(filt.q) + '"></th>' +
+        '<th class="hide-sm">' + sel('type', opt('', L('Vše', 'All'), filt.type) + GP.PLANT_TYPES.map(t => opt(t[0], L(t[1], t[2]), filt.type)).join('')) + '</th>' +
+        '<th class="hide-sm">' + sel('purpose', opt('', L('Vše', 'All'), filt.purpose) + GP.PLANT_OPTS.purpose.map(o => opt(o[0], L(o[1], o[2]), filt.purpose)).join('') + opt('_none', L('nevyplněno', 'not set'), filt.purpose)) + '</th>' +
+        '<th class="hide-sm">' + sel('crop', opt('', L('Vše', 'All'), filt.crop) + GP.PLANT_OPTS.crop.map(o => opt(o[0], L(o[1], o[2]), filt.crop)).join('') + opt('_none', L('bez užitku', 'none'), filt.crop)) + '</th>' +
+        '<th>' + sel('color', opt('', L('Vše', 'All'), filt.color) + GP.PLANT_OPTS.flowerColors.map(o => opt(o[0], L(o[1], o[2]), filt.color)).join('')) + '</th>' +
+        '<th class="hide-sm">' + sel('garden', opt('', L('Vše', 'All'), filt.garden) + GP.state.gardens.map(g => opt(g.id, g.name, filt.garden)).join('')) + '</th>' +
+        '<th>' + sel('missing', opt('', L('Vše', 'All'), filt.missing) + opt('_any', L('Nekompletní', 'Incomplete'), filt.missing) +
+          opt('_unsure', L('Neurčené (?)', 'Unidentified (?)') + ' · ' + all.filter(p => p.unsure).length, filt.missing) +
+          GP.PLANT_FIELDS.filter(f => f.core).map(f => opt(f.key, L('Chybí: ', 'Missing: ') + GP.fieldLabel(f), filt.missing)).join('')) + '</th></tr>';
+      const anyFilter = ['q', 'type', 'purpose', 'crop', 'color', 'garden', 'missing'].some(k => filt[k]);
+      const filters = '<div class="row gap list-tools"><label class="small muted">' + L('Řadit:', 'Sort:') + ' <select data-f="sort">' + opt('name', L('název', 'name'), filt.sort) + opt('latin', L('latinsky', 'Latin'), filt.sort) +
+        opt('bloom', L('doba květu', 'flowering'), filt.sort) + opt('complete', L('vyplněnost', 'completeness'), filt.sort) + '</select></label>' +
+        (anyFilter ? '<button class="link small" data-act="nofilter">✕ ' + L('Zrušit filtry', 'Clear filters') + '</button>' : '') + '</div>';
       // gardens the plant grows in, with the number of pieces ("Zahrada (3 ks)")
       const gardensOf = p => {
         const by = new Map();
@@ -96,7 +103,7 @@
           '<td>' + colorPills(p) + '</td>' +
           '<td class="hide-sm small">' + gardensOf(p) + '</td>' +
           '<td>' + sectionBars(p) + '</td></tr>').join('');
-      return head + filters + '<div class="panel flush"><table class="tbl plants"><thead><tr><th></th><th>' + L('Název', 'Name') + '</th><th class="hide-sm">' + L('Typ', 'Type') + '</th><th class="hide-sm">' + L('Funkce', 'Purpose') + '</th><th class="hide-sm">' + L('Užitek', 'Crop') + '</th><th>' + L('Barva květů', 'Flower colour') + '</th><th class="hide-sm">' + L('Zahrada', 'Garden') + '</th><th title="' + L('Vyplněnost sekcí karty', 'How complete each section of the card is') + '"><span class="sec-head">' + SECTIONS().map(s => '<span>' + esc(s) + '</span>').join('') + '</span></th></tr></thead><tbody>' +
+      return head + filters + '<div class="panel flush"><table class="tbl plants"><thead><tr><th></th><th>' + L('Název', 'Name') + '</th><th class="hide-sm">' + L('Typ', 'Type') + '</th><th class="hide-sm">' + L('Funkce', 'Purpose') + '</th><th class="hide-sm">' + L('Užitek', 'Crop') + '</th><th>' + L('Barva květů', 'Flower colour') + '</th><th class="hide-sm">' + L('Zahrada', 'Garden') + '</th><th title="' + L('Vyplněnost sekcí karty', 'How complete each section of the card is') + '"><span class="sec-head">' + SECTIONS().map(s => '<span>' + esc(s) + '</span>').join('') + '</span></th></tr>' + filterRow + '</thead><tbody>' +
         (rows || '<tr><td colspan="8" class="muted">' + L('Nic neodpovídá filtru.', 'Nothing matches the filter.') + '</td></tr>') + '</tbody></table></div>' +
         '<p class="muted small">' + list.length + ' / ' + all.length + '</p>';
     },
@@ -119,6 +126,8 @@
       };
       const ex = root.querySelector('[data-act=export]');
       if (ex) ex.onclick = () => GP.ui.download('rostliny-' + new Date().toISOString().slice(0, 10) + '.csv', GP.csv.exportPlants(), 'text/csv;charset=utf-8');
+      const nf = root.querySelector('[data-act=nofilter]');
+      if (nf) nf.onclick = () => { for (const k of ['q', 'type', 'purpose', 'crop', 'color', 'garden', 'missing']) filt[k] = ''; GP.render(); };
       root.querySelectorAll('[data-f]').forEach(el => {
         el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', () => {
           filt[el.dataset.f] = el.value;
