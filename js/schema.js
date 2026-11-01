@@ -283,7 +283,9 @@
     pollination: p => p.purpose === 'ornamental',
     flowerShowy: p => p.leafType === 'conifer', flowerColors: p => p.leafType === 'conifer',
     bloomMonths: p => p.leafType === 'conifer', scent: p => p.leafType === 'conifer',
-    autumnColors: p => p.foliage === 'evergreen' || p.leafType === 'conifer',
+    autumnColors: p => p.foliage === 'evergreen' || p.leafType === 'conifer' || sown(p),
+    // annuals and biennials are neither evergreen nor deciduous
+    foliage: p => ['annual', 'biennial'].includes(p.type),
     harvestMonths: p => p.fruit !== 'edible' && !p.crop,
     depth: p => !sown(p) && p.type !== 'bulb',
     bearing: true
@@ -334,8 +336,9 @@
       }
       case 'num': {
         if (f.key === 'hardiness') { const c = GP.hardinessC(raw); return c == null ? undefined : String(Math.round(c)); }
-        const n = String(raw).match(/-?\d+(?:[.,]\d+)?/);
-        return n ? n[0] : undefined;
+        // a number or a range ("20–24", "0,5–1")
+        const n = String(raw).match(/-?\d+(?:[.,]\d+)?(?:\s*[–-]\s*\d+(?:[.,]\d+)?)?/);
+        return n ? n[0].replace(/\s*[–-]\s*(?=\d)/g, (m, i) => (i ? '–' : m)) : undefined;
       }
       default: return String(raw).trim();
     }
