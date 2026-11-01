@@ -2,6 +2,7 @@
 // Start: node server.js   (configuration: see database.js and .env.example)
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
 import express from 'express';
 import { pool, initDatabase } from './database.js';
 
@@ -20,11 +21,32 @@ const COLLECTIONS = {
   tasks: { table: 'tasks', cols: t => ({ garden_id: t.gardenId || null, title: str(t.title) }) }
 };
 const META_KEYS = ['settings', 'taskDone', 'version'];
+const PHOTO_KINDS = ['plants', 'gardens'];
 
-async function upsert(conn, name, objects) {
+// Photos arrive as data URLs (hundreds of kB each). They go to the photos table and the object keeps only
+// their address, so /api/state stays small and the browser caches every photo.
+async function storePhoto(conn, name, obj) {
+  if (!PHOTO_KINDS.includes(name)) return obj;
+  const id = str(obj.id, 32);
+  const m = /^data:(image\/[\w.+-]+);base64,/.exec(typeof obj.photo === 'string' ? obj.photo : '');
+  if (m) {
+    const img = Buffer.from(obj.photo.slice(m[0].length), 'base64');
+    const v = crypto.createHash('sha1').update(img).digest('hex').slice(0, 12);
+    await conn.query('INSERT INTO photos (kind, id, mime, img) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE mime=VALUES(mime), img=VALUES(img)', [name, id, m[1], img]);
+    return Object.assign({}, obj, { photo: 'api/photo/' + name + '/' + encodeURIComponent(id) + '?v=' + v });
+  }
+  if (!obj.photo) await conn.query('DELETE FROM photos WHERE kind=? AND id=?', [name, id]);
+  return obj;
+}
+
+// rewritten (optional) collects [collection, id, photo address] for photos moved to the photos table
+async function upsert(conn, name, objects, rewritten) {
   const c = COLLECTIONS[name];
-  for (const obj of objects) {
+  for (let obj of objects) {
     if (!obj || typeof obj.id !== 'string' || !obj.id) continue;
+    const stored = await storePhoto(conn, name, obj);
+    if (rewritten && stored.photo !== obj.photo) rewritten.push([name, obj.id, stored.photo]);
+    obj = stored;
     const cols = c.cols(obj);
     const names = ['id', ...Object.keys(cols), 'data'];
     const values = [str(obj.id, 32), ...Object.values(cols), JSON.stringify(obj)];
@@ -89,17 +111,22 @@ app.post('/api/sync', async (req, res, next) => {
     const counts = Object.keys(COLLECTIONS).map(n => [n, ((body.upsert || {})[n] || []).length, ((body.delete || {})[n] || []).length]).filter(c => c[1] || c[2]);
     const what = counts.map(([n, u, d]) => n + ' ' + u + (d ? '/-' + d : '')).join(', ') || 'meta';
     console.log(new Date().toISOString(), 'sync start', kb + ' kB', what);
+    const photos = [];
     await inTransaction(async conn => {
       for (const name of Object.keys(COLLECTIONS)) {
         const up = body.upsert && body.upsert[name];
-        if (Array.isArray(up) && up.length) await upsert(conn, name, up);
+        if (Array.isArray(up) && up.length) await upsert(conn, name, up, photos);
         const del = body.delete && body.delete[name];
-        if (Array.isArray(del) && del.length) await conn.query('DELETE FROM ' + COLLECTIONS[name].table + ' WHERE id IN (?)', [del.map(id => str(id, 32))]);
+        if (Array.isArray(del) && del.length) {
+          const ids = del.map(id => str(id, 32));
+          await conn.query('DELETE FROM ' + COLLECTIONS[name].table + ' WHERE id IN (?)', [ids]);
+          if (PHOTO_KINDS.includes(name)) await conn.query('DELETE FROM photos WHERE kind=? AND id IN (?)', [name, ids]);
+        }
       }
       if (body.meta) await saveMeta(conn, body.meta);
     });
     console.log(new Date().toISOString(), 'sync done', what, (Date.now() - t0) + ' ms');
-    res.json({ ok: true });
+    res.json({ ok: true, photos });
   } catch (e) { next(e); }
 });
 
@@ -119,6 +146,30 @@ app.post('/api/replace', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// The address changes with the photo (?v=hash), so the browser may keep it for good.
+app.get('/api/photo/:kind/:id', async (req, res, next) => {
+  try {
+    const [row] = await pool.query('SELECT mime, img FROM photos WHERE kind=? AND id=?', [req.params.kind, req.params.id]);
+    if (!row) return res.status(404).json({ error: 'not found' });
+    res.set('Cache-Control', 'public, max-age=31536000, immutable').type(row.mime).send(row.img);
+  } catch (e) { next(e); }
+});
+
+// Data saved before the photos table existed keeps photos inside the JSON: move them out once.
+async function movePhotos() {
+  for (const name of PHOTO_KINDS) {
+    const table = COLLECTIONS[name].table;
+    const rows = await pool.query('SELECT id FROM ' + table + ' WHERE data LIKE ?', ['%"photo":"data:%']);
+    for (const { id } of rows) {
+      await inTransaction(async conn => {
+        const [row] = await conn.query('SELECT data FROM ' + table + ' WHERE id=?', [id]);
+        if (row) await upsert(conn, name, [JSON.parse(row.data)]);
+      });
+    }
+    if (rows.length) console.log(new Date().toISOString(), 'moved', rows.length, name, 'photos to the photos table');
+  }
+}
+
 // Only the app's own files are public (not this server folder with .env).
 app.get('/', (req, res) => res.sendFile(path.join(APP_DIR, 'index.html')));
 for (const dir of ['css', 'js', 'sample']) app.use('/' + dir, express.static(path.join(APP_DIR, dir)));
@@ -130,6 +181,7 @@ app.use((err, req, res, next) => {
 });
 
 initDatabase()
+  .then(() => movePhotos().catch(e => console.error(new Date().toISOString(), 'moving photos failed:', e.message)))
   .then(() => app.listen(PORT, () => console.log('GardenPlan: http://localhost:' + PORT + '  (database ' + (env.DB_NAME || 'gardenplan') + ' @ ' + (env.DB_HOST || 'localhost') + ')')))
   .catch(e => {
     console.error('Cannot connect to MariaDB / create tables:', e.message);

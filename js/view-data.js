@@ -18,7 +18,23 @@
     },
     mount(root) {
       const stamp = () => new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
-      root.querySelector('[data-act=backup]').onclick = () => GP.ui.download('gardenplan-zaloha-' + stamp() + '.json', JSON.stringify(GP.state, null, 1), 'application/json');
+      // photos stored on the server are put into the file, so the backup works anywhere
+      root.querySelector('[data-act=backup]').onclick = async e => {
+        const b = e.currentTarget;
+        b.disabled = true;
+        const data = JSON.parse(JSON.stringify(GP.state));
+        let missing = 0;
+        for (const x of [...data.plants, ...data.gardens]) {
+          if (!/^api\/photo\//.test(x.photo || '')) continue;
+          try {
+            const blob = await (await fetch(x.photo)).blob();
+            x.photo = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(fr.result); fr.onerror = reject; fr.readAsDataURL(blob); });
+          } catch (err) { missing++; }
+        }
+        b.disabled = false;
+        GP.ui.download('gardenplan-zaloha-' + stamp() + '.json', JSON.stringify(data, null, 1), 'application/json');
+        if (missing) GP.ui.toast(L('Některé fotky se nepodařilo přidat do zálohy: ', 'Some photos could not be added to the backup: ') + missing);
+      };
       root.querySelector('[data-act=csv]').onclick = () => GP.ui.download('rostliny-' + stamp() + '.csv', GP.csv.exportPlants(), 'text/csv;charset=utf-8');
       root.querySelector('[data-act=restore]').onchange = async e => {
         const f = e.target.files[0];

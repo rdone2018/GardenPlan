@@ -59,7 +59,10 @@
 
   window.addEventListener('hashchange', () => { GP.render(); window.scrollTo(0, 0); });
   window.addEventListener('beforeunload', () => GP.saveNow());
-  document.addEventListener('visibilitychange', () => { if (document.hidden) GP.saveNow(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) GP.saveNow();
+    else GP.refresh().then(changed => { if (changed) GP.render(); });
+  });
 
   GP.load().then(GP.render);
 })(window.GP);

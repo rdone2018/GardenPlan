@@ -77,12 +77,21 @@ window.GP = window.GP || {};
     return o;
   }
 
-  // Server data + local changes the server never got (local wins per item; nothing is deleted).
+  // Fingerprints of the items as the server last confirmed them, kept with syncInfo: after a reload they tell
+  // which local items were really changed here (and must not be overwritten by an older copy from this device).
+  const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return (h >>> 0).toString(36); };
+  function setBase() {
+    syncInfo.base = {};
+    for (const c of COLLECTIONS) { const b = syncInfo.base[c] = {}; for (const [id, json] of snap[c]) b[id] = hash(json); }
+  }
+
+  // Server data + local changes the server never got (only items changed on this device win; nothing is deleted).
   function mergeLocal(server, local) {
     const out = Object.assign(emptyState(), server);
+    const base = syncInfo.base;
     for (const c of COLLECTIONS) {
       const m = new Map((server[c] || []).map(x => [x.id, x]));
-      for (const x of local[c] || []) if (x && x.id) m.set(x.id, x);
+      for (const x of local[c] || []) if (x && x.id && !(base && base[c] && base[c][x.id] === hash(JSON.stringify(x)))) m.set(x.id, x);
       out[c] = [...m.values()];
     }
     out.settings = local.settings || out.settings;
@@ -112,6 +121,9 @@ window.GP = window.GP || {};
     if (GP.storageMode !== 'server' || GP.offline || !snap) return;
     if (syncing) { again = true; return syncing; }
     syncing = (async () => {
+      // with nothing to send the body would finish before `syncing` is assigned and leave it set for good
+      // (every later save was then skipped while the status still said "saved")
+      await null;
       let part = 0;
       try {
         for (;;) {
@@ -145,11 +157,24 @@ window.GP = window.GP || {};
             try { e = (await r.json()).error || ''; } catch (x) { /* proxy error page */ }
             throw new Error('HTTP ' + r.status + (r.status === 413 ? ' – ' + GP.L('příliš velký požadavek', 'request too large') : '') + (e ? ' – ' + e : ''));
           }
+          let answer = {};
+          try { answer = await r.json(); } catch (e) { /* older server */ }
           for (const [c, id, json] of sent) { if (json === null) snap[c].delete(id); else snap[c].set(id, json); }
           if (body.meta) snap.meta = next.meta;
+          // the server keeps photos separately and answers with their addresses: use them here too (smaller saves)
+          for (const [c, id, url] of answer.photos || []) {
+            const o = JSON.parse(snap[c].get(id) || 'null');
+            if (!o) continue;
+            const item = GP.state[c].find(x => x.id === id);
+            if (item && item.photo === o.photo) item.photo = url;
+            o.photo = url;
+            snap[c].set(id, JSON.stringify(o));
+          }
+          if ((answer.photos || []).length) writeLocal();
         }
         clearTimeout(retryTimer);
         syncInfo.dirty = false;
+        setBase();
         writeSyncInfo();
         status('✓ ' + GP.L('Uloženo na server', 'Saved to server') + ' ' + now());
       } catch (e) {
@@ -170,8 +195,11 @@ window.GP = window.GP || {};
     GP.storageMode = 'server';
     GP.offline = false;
     snap = snapshot(Object.assign(emptyState(), serverState));
-    GP.state = syncInfo.dirty && local ? mergeLocal(serverState, local) : Object.assign(emptyState(), serverState);
-    const pending = syncInfo.dirty && local;
+    // a copy saved by an older version has no fingerprints: it cannot tell its own changes from stale items, so it
+    // would overwrite newer data from other devices – the server copy wins then
+    const pending = syncInfo.dirty && local && syncInfo.base;
+    GP.state = pending ? mergeLocal(serverState, local) : Object.assign(emptyState(), serverState);
+    setBase();
     syncInfo.mode = 'server';
     writeLocal();
     if (pending) { status(GP.L('Odesílám neuložené změny…', 'Sending unsaved changes…')); setTimeout(syncServer, 300); }
@@ -217,7 +245,23 @@ window.GP = window.GP || {};
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   };
 
+  // Another device may have changed the data meanwhile: fetch the current state (only when nothing is waiting
+  // to be saved here). Returns true when something changed.
+  GP.refresh = async function () {
+    if (GP.storageMode !== 'server' || GP.offline || !snap || saveTimer || syncing || syncInfo.dirty) return false;
+    const r = await fetchState();
+    if (!r.state || saveTimer || syncing || syncInfo.dirty) return false;
+    const next = snapshot(Object.assign(emptyState(), r.state));
+    if (next.meta === snap.meta && COLLECTIONS.every(c => next[c].size === snap[c].size && [...next[c]].every(([id, json]) => snap[c].get(id) === json))) return false;
+    snap = next;
+    setBase();
+    GP.state = Object.assign(emptyState(), r.state);
+    writeLocal();
+    return true;
+  };
+
   function write() {
+    saveTimer = null;
     if (GP.storageMode === 'server') syncInfo.dirty = true;
     writeLocal();
     if (GP.storageMode === 'server') syncServer();

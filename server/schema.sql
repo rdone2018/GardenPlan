@@ -51,6 +51,16 @@ CREATE TABLE IF NOT EXISTS tasks (
   updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Photos of plants and gardens, kept out of `data` so loading the app stays fast (served by /api/photo/kind/id)
+CREATE TABLE IF NOT EXISTS photos (
+  kind       VARCHAR(16)  NOT NULL,
+  id         VARCHAR(32)  NOT NULL,
+  mime       VARCHAR(32)  NOT NULL DEFAULT 'image/jpeg',
+  img        LONGBLOB     NOT NULL,
+  updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (kind, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- App-wide values: settings (language…), ticked-off calendar tasks, data version
 CREATE TABLE IF NOT EXISTS meta (
   k          VARCHAR(32)  NOT NULL PRIMARY KEY,
