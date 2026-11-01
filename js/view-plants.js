@@ -2,6 +2,7 @@
 (function (GP) {
   const L = GP.L, esc = GP.esc;
   const FILTERS = ['q', 'type', 'purpose', 'crop', 'color', 'bloomIn', 'harvestIn', 'garden', 'missing'];
+  const picked = new Set(); // plants ticked in the catalog (for this session), e.g. to add them to a garden at once
   const filt = GP.plantFilter = { q: '', type: '', purpose: '', crop: '', color: '', bloomIn: '', harvestIn: '', missing: '', garden: '', sort: 'name' };
 
   GP.newPlant = function (data) {
@@ -80,6 +81,40 @@
       (c ? ' class="on" style="background:' + color + ';opacity:' + (0.25 + 0.75 * c / max).toFixed(2) + '"' : '') + '></i>').join('') + '</span>';
   }
 
+  // Adds the ticked plants to a garden in one go (no place on the plan yet – that is done later on the plan).
+  function addToGardenDialog(plants) {
+    const gardens = GP.state.gardens;
+    if (!gardens.length) return GP.ui.toast(L('Nejdřív založte zahradu (Zahrady → Nová zahrada).', 'Create a garden first (Gardens → New garden).'));
+    const box = document.createElement('div');
+    box.className = 'modal';
+    box.innerHTML = '<div class="modal-box"><div class="row gap"><b class="grow">🏡 ' + L('Přidat do zahrady', 'Add to garden') + ' – ' + plants.length + ' ' + L('rostlin', 'plants') + '</b><button class="link" data-x>✕</button></div>' +
+      '<div class="form">' +
+      '<label class="field"><span class="lbl">' + L('Zahrada', 'Garden') + '</span><select data-g>' + gardens.map(g => '<option value="' + g.id + '">' + esc(g.name) + '</option>').join('') + '</select></label>' +
+      '<label class="field"><span class="lbl">' + L('Stav', 'Status') + '</span><select data-s>' + GP.STATUSES.filter(s => s[0] !== 'removed').map(s => '<option value="' + s[0] + '"' + (s[0] === 'planted' ? ' selected' : '') + '>' + esc(L(s[1], s[2])) + '</option>').join('') + '</select></label>' +
+      '<label class="field"><span class="lbl">' + L('Vysazeno dne', 'Planted on') + '</span><input type="date" data-d></label></div>' +
+      '<p class="small muted">' + L('Datum je nepovinné a dá se později upravit v zahradě (záložka Rostliny), i každé rostlině zvlášť. Rostliny, které už v zahradě jsou, se přeskočí. Místo na plánu zahrady jim určíte později.',
+        'The date is optional and can be changed later in the garden (Plants tab), for each plant separately too. Plants already in the garden are skipped. Their place on the garden plan is set later.') + '</p>' +
+      '<div class="row gap"><button class="btn primary" data-ok>' + L('Přidat', 'Add') + '</button><button class="btn" data-x>' + L('Zrušit', 'Cancel') + '</button></div></div>';
+    document.body.appendChild(box);
+    const close = () => box.remove();
+    box.querySelectorAll('[data-x]').forEach(b => b.onclick = close);
+    box.addEventListener('click', e => { if (e.target === box) close(); });
+    box.querySelector('[data-ok]').onclick = () => {
+      const gid = box.querySelector('[data-g]').value, status = box.querySelector('[data-s]').value, date = box.querySelector('[data-d]').value;
+      let added = 0, skipped = 0;
+      for (const p of plants) {
+        if (GP.state.placements.some(x => x.plantId === p.id && x.gardenId === gid && x.status !== 'removed')) { skipped++; continue; }
+        GP.state.placements.push({ id: GP.uid(), plantId: p.id, gardenId: gid, cells: [], status, position: '', plantedDate: date, count: '', notes: '' });
+        added++;
+      }
+      picked.clear();
+      GP.saveNow();
+      close();
+      GP.ui.toast(L('Přidáno do zahrady: ', 'Added to the garden: ') + added + (skipped ? ' · ' + L('už tam bylo: ', 'already there: ') + skipped : ''));
+      GP.render();
+    };
+  }
+
   // Flower colours as coloured labels ("bílá", "růžová"); dark text on light colours, white on dark ones.
   function colorPills(p) {
     const opts = GP.PLANT_OPTS.flowerColors;
@@ -106,7 +141,7 @@
       }
       // filters sit in the table header, each one above the column it filters
       const sel = (f, html) => '<select data-f="' + f + '"' + (filt[f] ? ' class="on"' : '') + '>' + html + '</select>';
-      const filterRow = '<tr class="filter-row"><th></th>' +
+      const filterRow = '<tr class="filter-row"><th class="pick"></th><th></th>' +
         '<th><input type="search" data-f="q" placeholder="' + L('Hledat v názvech…', 'Search names…') + '" title="' + L('Česky, slovensky, anglicky i latinsky', 'Czech, Slovak, English or Latin') + '" value="' + esc(filt.q) + '"></th>' +
         '<th class="hide-sm">' + sel('type', opt('', L('Vše', 'All'), filt.type) + GP.PLANT_TYPES.map(t => opt(t[0], L(t[1], t[2]), filt.type)).join('')) + '</th>' +
         '<th class="hide-sm">' + sel('purpose', opt('', L('Vše', 'All'), filt.purpose) + GP.PLANT_OPTS.purpose.map(o => opt(o[0], L(o[1], o[2]), filt.purpose)).join('') + opt('_none', L('nevyplněno', 'not set'), filt.purpose)) + '</th>' +
@@ -118,8 +153,12 @@
           opt('_unsure', L('Neurčené (?)', 'Unidentified (?)') + ' · ' + all.filter(p => p.unsure).length, filt.missing) +
           GP.PLANT_FIELDS.filter(f => f.core).map(f => opt(f.key, L('Chybí: ', 'Missing: ') + GP.fieldLabel(f), filt.missing)).join('')) + '</th></tr>';
       const anyFilter = FILTERS.some(k => filt[k]);
+      for (const id of picked) if (!GP.byId('plants', id)) picked.delete(id);
       const filters = '<div class="row gap list-tools"><label class="small muted">' + L('Řadit:', 'Sort:') + ' <select data-f="sort">' + SORTS().map(([k, label]) => opt(k, label, filt.sort)).join('') + '</select></label>' +
+        (picked.size ? '<span class="pick-bar"><b>' + L('Vybráno: ', 'Selected: ') + picked.size + '</b> <button class="btn primary small" data-act="togarden">🏡 ' + L('Přidat do zahrady', 'Add to garden') + '</button>' +
+          ' <button class="link small" data-act="nopick">✕ ' + L('Zrušit výběr', 'Clear selection') + '</button></span>' : '<span class="small muted">' + L('Zaškrtnutím vyberete rostliny, např. k přidání do zahrady.', 'Tick plants to select them, e.g. to add them to a garden.') + '</span>') +
         (anyFilter ? '<button class="link small" data-act="nofilter">✕ ' + L('Zrušit filtry', 'Clear filters') + '</button>' : '') + '</div>';
+      const allPicked = list.length && list.every(p => picked.has(p.id)), somePicked = list.some(p => picked.has(p.id));
       // gardens the plant grows in, with the number of pieces ("Zahrada (3 ks)")
       const gardensOf = p => {
         const by = new Map();
@@ -129,7 +168,7 @@
         }
         return [...by].map(([gid, n]) => { const g = GP.byId('gardens', gid); return g ? esc(g.name) + (n > 1 ? ' <span class="muted">(' + n + ' ' + L('ks', 'pcs') + ')</span>' : '') : ''; }).filter(Boolean).join(', ');
       };
-      const rows = list.map(p => '<tr data-href="#/plant/' + p.id + '"><td class="thumb">' + (p.photo ? '<img src="' + p.photo + '" alt="" loading="lazy">' : '') + '</td>' +
+      const rows = list.map(p => '<tr data-href="#/plant/' + p.id + '"' + (picked.has(p.id) ? ' class="picked"' : '') + '><td class="pick"><input type="checkbox" data-pick="' + p.id + '"' + (picked.has(p.id) ? ' checked' : '') + '></td><td class="thumb">' + (p.photo ? '<img src="' + p.photo + '" alt="" loading="lazy">' : '') + '</td>' +
           '<td><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a><div class="italic small muted">' + esc(p.name_la) + '</div></td>' +
           '<td class="hide-sm">' + esc(GP.typeLabel(p.type)) + '</td>' +
           '<td class="hide-sm small">' + esc(GP.optLabel(GP.PLANT_OPTS.purpose, p.purpose)) + '</td>' +
@@ -140,15 +179,16 @@
           '<td class="hide-sm small">' + gardensOf(p) + '</td>' +
           '<td>' + sectionBars(p) + '</td></tr>').join('');
       // how the plants in the list cover the year – gaps show months with nothing in flower / to harvest
-      const cover = list.length < 2 ? '' : '<tfoot><tr class="cover-row"><td></td><td class="small">' + L('Pokrytí roku', 'Year coverage') + ' <span class="muted">(' + list.length + ')</span></td>' +
+      const cover = list.length < 2 ? '' : '<tfoot><tr class="cover-row"><td class="pick"></td><td></td><td class="small">' + L('Pokrytí roku', 'Year coverage') + ' <span class="muted">(' + list.length + ')</span></td>' +
         '<td class="hide-sm" colspan="4"></td><td class="hide-sm">' + coverageStrip(list, 'bloomMonths', BLOOM, L('kvete', 'in flower')) + '</td>' +
         '<td class="hide-sm">' + coverageStrip(list, 'harvestMonths', HARVEST, L('zraje', 'ripening')) + '</td><td class="hide-sm" colspan="2"></td></tr></tfoot>';
-      return head + filters + '<div class="panel flush"><table class="tbl plants"><thead><tr><th></th>' + sortTh(filt.sort === 'latin' ? 'latin' : 'name', filt.sort === 'latin' ? L('Název – latinsky', 'Name – Latin') : L('Název', 'Name')) +
+      return head + filters + '<div class="panel flush"><table class="tbl plants"><thead><tr><th class="pick"><input type="checkbox" data-pickall title="' + L('Vybrat všechny zobrazené', 'Select all shown') + '"' +
+        (allPicked ? ' checked' : '') + (somePicked && !allPicked ? ' data-some' : '') + '></th><th></th>' + sortTh(filt.sort === 'latin' ? 'latin' : 'name', filt.sort === 'latin' ? L('Název – latinsky', 'Name – Latin') : L('Název', 'Name')) +
         sortTh('type', L('Typ', 'Type'), 'hide-sm') + sortTh('purpose', L('Funkce', 'Purpose'), 'hide-sm') + sortTh('crop', L('Užitek', 'Crop'), 'hide-sm') +
         '<th>' + L('Barva květů', 'Flower colour') + '</th>' + sortTh('bloom', L('Kvete', 'Flowers'), 'hide-sm') + sortTh('harvest', L('Zrání', 'Ripens'), 'hide-sm') +
         '<th class="hide-sm">' + L('Zahrada', 'Garden') + '</th>' +
         sortTh('complete', '<span class="sec-head">' + SECTIONS().map(s => '<span>' + esc(s) + '</span>').join('') + '</span>') + '</tr>' + filterRow + '</thead><tbody>' +
-        (rows || '<tr><td colspan="10" class="muted">' + L('Nic neodpovídá filtru.', 'Nothing matches the filter.') + '</td></tr>') + '</tbody>' + cover + '</table></div>' +
+        (rows || '<tr><td colspan="11" class="muted">' + L('Nic neodpovídá filtru.', 'Nothing matches the filter.') + '</td></tr>') + '</tbody>' + cover + '</table></div>' +
         '<p class="muted small">' + list.length + ' / ' + all.length + '</p>';
     },
     mount(root) {
@@ -186,7 +226,18 @@
           if (el.tagName === 'INPUT') { const n = document.querySelector('[data-f=q]'); n.focus(); n.setSelectionRange(pos, pos); }
         });
       });
-      root.querySelectorAll('tr[data-href]').forEach(tr => tr.addEventListener('click', e => { if (!e.target.closest('a')) location.hash = tr.dataset.href; }));
+      root.querySelectorAll('tr[data-href]').forEach(tr => tr.addEventListener('click', e => { if (!e.target.closest('a') && !e.target.closest('.pick')) location.hash = tr.dataset.href; }));
+      // ticking plants: one by one, or all shown with the header box
+      const pa = root.querySelector('[data-pickall]');
+      if (pa) {
+        pa.indeterminate = pa.hasAttribute('data-some');
+        pa.onchange = () => { for (const p of filtered()) { if (pa.checked) picked.add(p.id); else picked.delete(p.id); } GP.render(); };
+      }
+      root.querySelectorAll('[data-pick]').forEach(cb => cb.onchange = () => { if (cb.checked) picked.add(cb.dataset.pick); else picked.delete(cb.dataset.pick); GP.render(); });
+      const np = root.querySelector('[data-act=nopick]');
+      if (np) np.onclick = () => { picked.clear(); GP.render(); };
+      const tg = root.querySelector('[data-act=togarden]');
+      if (tg) tg.onclick = () => addToGardenDialog([...picked].map(id => GP.byId('plants', id)).filter(Boolean));
     }
   };
 

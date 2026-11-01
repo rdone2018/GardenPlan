@@ -454,11 +454,17 @@
     const pls = GP.state.placements.filter(p => p.gardenId === g.id);
     const byCell = placementsByCell(g);
     if (!pls.length) return '<div class="empty"><p>' + L('V zahradě zatím nejsou rostliny. Přidejte je v plánu (vyberte rostlinu a klikněte do mřížky), na kartě rostliny, nebo při importu CSV.', 'No plants in this garden yet. Add them on the plan (pick a plant, click the grid), from a plant card, or during CSV import.') + '</p></div>';
-    return '<div class="panel"><table class="tbl"><thead><tr><th>' + L('Rostlina', 'Plant') + '</th><th>' + L('Umístění', 'Position') + '</th><th>' + L('Na plánu', 'On plan') + '</th><th>' + L('Stav', 'Status') + '</th><th>' + L('Vysazeno dne', 'Planted on') + '</th><th>' + L('Ks', 'Qty') + '</th><th>' + L('Upozornění', 'Warnings') + '</th></tr></thead><tbody>' +
+    // tick rows to set the date / status of many plants at once
+    const bulk = '<div class="row gap list-tools" data-bulk><span class="small"><b data-n>0</b> ' + L('vybráno', 'selected') + '</span>' +
+      '<label class="small">' + L('Vysazeno dne', 'Planted on') + ' <input type="date" data-bd></label><button class="btn small" data-act="bdate" disabled>' + L('Nastavit vybraným', 'Set for selected') + '</button>' +
+      '<label class="small">' + L('Stav', 'Status') + ' <select data-bs>' + GP.STATUSES.map(s => '<option value="' + s[0] + '"' + (s[0] === 'planted' ? ' selected' : '') + '>' + esc(L(s[1], s[2])) + '</option>').join('') + '</select></label>' +
+      '<button class="btn small" data-act="bstatus" disabled>' + L('Nastavit vybraným', 'Set for selected') + '</button>' +
+      '<button class="link small danger" data-act="bremove" disabled>✕ ' + L('Odebrat ze zahrady', 'Remove from garden') + '</button></div>';
+    return bulk + '<div class="panel"><table class="tbl"><thead><tr><th class="pick"><input type="checkbox" data-pickall title="' + L('Vybrat vše', 'Select all') + '"></th><th>' + L('Rostlina', 'Plant') + '</th><th>' + L('Umístění', 'Position') + '</th><th>' + L('Na plánu', 'On plan') + '</th><th>' + L('Stav', 'Status') + '</th><th>' + L('Vysazeno dne', 'Planted on') + '</th><th>' + L('Ks', 'Qty') + '</th><th>' + L('Upozornění', 'Warnings') + '</th></tr></thead><tbody>' +
       pls.map(pl => {
         const p = GP.byId('plants', pl.plantId);
         const issues = [...new Set((pl.cells && pl.cells.length ? pl.cells : [null]).flatMap(k => GP.plantIssues(p, g, k, byCell)))];
-        return '<tr data-pl="' + pl.id + '"><td>' + GP.ui.swatch(GP.colorHex(p)) + ' <a href="#/plant/' + pl.plantId + '">' + esc(GP.plantName(p)) + '</a></td>' +
+        return '<tr data-pl="' + pl.id + '"><td class="pick"><input type="checkbox" data-pick></td><td>' + GP.ui.swatch(GP.colorHex(p)) + ' <a href="#/plant/' + pl.plantId + '">' + esc(GP.plantName(p)) + '</a></td>' +
           '<td><input type="text" data-k="position" value="' + esc(pl.position) + '"></td>' +
           '<td class="small">' + (pl.cells && pl.cells.length ? pl.cells.slice(0, 6).map(GP.cellName).join(', ') + (pl.cells.length > 6 ? '…' : '') : '<span class="tag warn">' + L('neumístěno', 'not placed') + '</span>') + '</td>' +
           '<td><select data-k="status">' + GP.STATUSES.map(s => '<option value="' + s[0] + '"' + (pl.status === s[0] ? ' selected' : '') + '>' + esc(L(s[1], s[2])) + '</option>').join('') + '</select></td>' +
@@ -474,6 +480,31 @@
       tr.addEventListener('input', upd);
       tr.addEventListener('change', upd);
     });
+    const bar = root.querySelector('[data-bulk]');
+    if (!bar) return;
+    const boxes = [...root.querySelectorAll('tr[data-pl] [data-pick]')], all = root.querySelector('[data-pickall]');
+    const chosen = () => boxes.filter(b => b.checked).map(b => GP.byId('placements', b.closest('tr').dataset.pl));
+    const sync = () => {
+      const n = chosen().length;
+      bar.querySelector('[data-n]').textContent = n;
+      bar.querySelectorAll('button').forEach(b => b.disabled = !n);
+      all.checked = n && n === boxes.length;
+      all.indeterminate = n > 0 && n < boxes.length;
+      boxes.forEach(b => b.closest('tr').classList.toggle('picked', b.checked));
+    };
+    boxes.forEach(b => b.onchange = sync);
+    all.onchange = () => { boxes.forEach(b => b.checked = all.checked); sync(); };
+    const apply = (key, value) => { for (const pl of chosen()) pl[key] = value; GP.saveNow(); GP.render(); };
+    bar.querySelector('[data-act=bdate]').onclick = () => apply('plantedDate', bar.querySelector('[data-bd]').value);
+    bar.querySelector('[data-act=bstatus]').onclick = () => apply('status', bar.querySelector('[data-bs]').value);
+    bar.querySelector('[data-act=bremove]').onclick = () => {
+      const sel = chosen();
+      if (!confirm(L('Odebrat ze zahrady ' + sel.length + ' rostlin? Z katalogu rostlin se nesmažou.', 'Remove ' + sel.length + ' plants from the garden? They stay in the plant catalog.'))) return;
+      const ids = new Set(sel.map(pl => pl.id));
+      GP.state.placements = GP.state.placements.filter(pl => !ids.has(pl.id));
+      GP.saveNow(); GP.render();
+    };
+    sync();
   }
 
   // ----- plan -----
