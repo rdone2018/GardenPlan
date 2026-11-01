@@ -146,6 +146,8 @@
     toxicFor: [['people', 'pro lidi', 'for people'], ['animals', 'pro zvířata (psi, kočky)', 'for animals (dogs, cats)']],
     pollination: [['self', 'samosprašná', 'self-fertile', '^samospras|self'], ['partial', 'částečně samosprašná', 'partly self-fertile', 'castec|partly|partial'],
       ['cross', 'potřebuje opylovače', 'needs a pollinator', 'cizospras|opylov|cross|needs']],
+    bearing: [['once', 'jednouplodící', 'once-bearing (summer)', 'jednou|jednoraz|letni|once|summer'],
+      ['ever', 'remontantní (stáleplodící, plodí znovu až do mrazů)', 'everbearing (fruits again until frost)', 'remont|stalepl|everbear|ever|autumn']],
     // "none" = checked and there is nothing (different from not filled in yet)
     wildlife: [['bees', 'včely', 'bees', 'vcel|bee|cmel'], ['butterflies', 'motýli', 'butterflies', 'motyl|butterfl'], ['birds', 'ptáci', 'birds', 'ptac|ptak|bird'],
       ['none', 'žádný (nic zvláštního)', 'none (nothing special)', 'zadn|^ne$|^nie$|none|^no$']]
@@ -175,9 +177,12 @@
     F('cultivar', 0, 'text', 'Odrůda / kultivar', 'Cultivar / variety', ['odruda', 'kultivar', 'cultivar', 'variety', 'sorta']),
     F('rootstock', 0, 'text', 'Podnož', 'Rootstock', ['podnoz', 'rootstock']),
     F('genus', 0, 'text', 'Rod', 'Genus', ['rod', 'genus']),
-    F('origin', 0, 'text', 'Původ / domovina', 'Origin / native range', ['puvod', 'povod', 'domovina', 'origin', 'native']),
     F('family', 0, 'text', 'Čeleď', 'Family', ['celed', 'celad', 'family']),
-    F('link', 0, 'url', 'Odkaz', 'Link', ['odkaz', 'link', 'url', 'zdroj', 'eshop', 'web']),
+    // fruiting once a year or again until frosts (raspberries, strawberries, blackberries…)
+    F('bearing', 0, 'select', 'Sklizeň', 'Harvest', ['sklizen', 'remontantni', 'plodnost', 'bearing'], { opts: O.bearing, show: p => p.crop === 'fruit' && p.type !== 'tree' }),
+    F('origin', 0, 'text', 'Původ / domovina', 'Origin / native range', ['puvod', 'povod', 'domovina', 'origin', 'native']),
+    // not shown on the card any more (the data come from many sources); kept for old data and CSV
+    F('link', 0, 'url', 'Odkaz', 'Link', ['odkaz', 'link', 'url', 'zdroj', 'eshop', 'web'], { show: () => false }),
     F('type', 0, 'select', 'Typ', 'Type', ['typ', 'type', 'druh', 'kategorie'], { core: true, side: true, opts: GP.PLANT_TYPES }),
     F('purpose', 0, 'select', 'Funkce', 'Purpose', ['funkcia', 'funkce', 'ucel', 'purpose', 'function', 'vyuziti'], { side: true, opts: O.purpose }),
     F('crop', 0, 'select', 'Užitek', 'Crop', ['uzitek', 'uzitok', 'crop', 'produce'], { side: true, opts: O.crop }),
@@ -280,7 +285,8 @@
     bloomMonths: p => p.leafType === 'conifer', scent: p => p.leafType === 'conifer',
     autumnColors: p => p.foliage === 'evergreen' || p.leafType === 'conifer',
     harvestMonths: p => p.fruit !== 'edible' && !p.crop,
-    depth: p => !sown(p) && p.type !== 'bulb'
+    depth: p => !sown(p) && p.type !== 'bulb',
+    bearing: true
   };
   // Everything the card shows for this plant that should be filled in (care: only the items ticked under maintenance).
   GP.countedFields = plant => GP.PLANT_FIELDS.filter(f => {
