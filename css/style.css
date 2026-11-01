@@ -398,3 +398,20 @@ input.num { width: 4.5rem; }
 /* flower icon in the flower colour (calendar) */
 .flw { width: 1.15rem; height: 1.15rem; vertical-align: -.2rem; }
 .seg .flw { width: 1rem; height: 1rem; }
+
+/* care month: this / next month side by side, flowering | ripening, care blocks */
+.cal-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+.cal-sum.nx { background: #f6f6f4; color: var(--muted); }
+.cal-sum.nx .sum-n { color: var(--muted); }
+.sum-row { position: relative; border-radius: 6px; padding: .1rem .2rem; cursor: default; }
+.sum-row:hover, .sum-row:focus { background: #eef5e8; outline: none; }
+.cal-sum.nx .sum-row:hover, .cal-sum.nx .sum-row:focus { background: #e9eaec; }
+.sum-tip { display: none; position: absolute; z-index: 20; left: 0; top: 100%; margin-top: 2px; background: #fff; color: var(--ink, #2b2b26);
+  border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.12); padding: .4rem .6rem; font-size: .82rem; line-height: 1.35; min-width: 12rem; max-height: 16rem; overflow: auto; }
+.sum-row:hover .sum-tip, .sum-row:focus .sum-tip { display: block; }
+.care-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.2rem; }
+.care-blk { border: 1px solid #eeebe1; border-radius: 8px; padding: .3rem .7rem .4rem; margin-bottom: .6rem; }
+.care-blk h4 { margin: .2rem 0 .3rem; }
+.care-blk.blk-empty { opacity: .6; }
+.care-blk.blk-empty p { margin: 0; }
+@media (max-width: 640px) { .cal-2, .care-grid { grid-template-columns: 1fr; } }
