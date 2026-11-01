@@ -155,52 +155,82 @@
     return html + '</tbody></table></div><p class="small muted">' + L('Barva = kvete · 🍎 zrání · ', 'Colour = flowering · 🍎 ripening · ') + careFields().map(f => f.icon + ' ' + GP.fieldLabel(f)).join(' · ') + '</p>';
   }
 
-  // ---------- planting plan: sowing and planting out, for any plant in the catalog ----------
-  // (vegetables mostly – they are sown every year, so they stay here even when planted)
+  // ---------- planting plan: sowing and planting out of plants picked from the whole catalog ----------
+  // The pick is stored on the plant (p.sowPlan), so it syncs like any other plant change.
   const SOW = () => [['sowInMonths', '🏠'], ['sowOutMonths', '🌱'], ['plantMonths', '🪴']]
     .map(([key, icon]) => ({ f: GP.PLANT_FIELDS.find(x => x.key === key), icon })).filter(s => s.f);
-  const resown = p => ['annual', 'biennial'].includes(p.type) || ['vegetable', 'herb'].includes(p.crop);
   const sowMonths = (p, s) => (taskShown(p, s.f) && p[s.f.key]) || [];
+  const hasSow = p => SOW().some(s => sowMonths(p, s).length);
   // most advanced status of the plant in any garden ('' = not in a garden)
   const plantStatus = p => ['planted', 'planned', 'wish'].find(st => GP.state.placements.some(pl => pl.plantId === p.id && pl.status === st)) || '';
-  function sowCandidates() {
-    return GP.state.plants.filter(p => SOW().some(s => sowMonths(p, s).length)).filter(p => {
-      if (cal.sow === 'veg' && !resown(p)) return false;
-      // a tree or shrub already in the ground is not planted again
-      return cal.sow === 'all' || plantStatus(p) !== 'planted' || resown(p);
+  const plantsWord = n => L(n === 1 ? 'rostlina' : n >= 2 && n <= 4 ? 'rostliny' : 'rostlin', n === 1 ? 'plant' : 'plants');
+  // filters of the plant selection, the same as in the catalog
+  const pick = { q: '', type: '', purpose: '', crop: '', only: '' };
+  function pickList() {
+    const q = GP.norm(pick.q);
+    return GP.state.plants.filter(p => {
+      if (q && !GP.norm([p.name_cs, p.name_sk, p.name_en, p.name_la, p.cultivar].join(' ')).includes(q)) return false;
+      if (pick.type && p.type !== pick.type) return false;
+      if (pick.purpose === '_none' ? p.purpose : pick.purpose && p.purpose !== pick.purpose && p.purpose !== 'both') return false;
+      if (pick.crop && (p.crop || '') !== (pick.crop === '_none' ? '' : pick.crop)) return false;
+      if (pick.only === 'dated' && !hasSow(p)) return false;
+      if (pick.only === 'picked' && !p.sowPlan) return false;
+      return true;
     });
   }
 
   function plantingPage(m) {
-    const list = sowCandidates(), done = GP.state.taskDone;
-    const tag = p => { const st = plantStatus(p); return '<span class="tag' + (st ? '' : ' muted') + '">' + esc(st ? GP.statusLabel(st) : L('není v zahradě', 'not in a garden')) + '</span>'; };
-    const hint = (p, s) => (s.f.key === 'plantMonths'
-      ? [p.spacing ? L('spon ', 'spacing ') + p.spacing + ' cm' : '', p.depth ? L('hloubka ', 'depth ') + p.depth + ' cm' : '']
-      : [p.germDays ? L('klíčí ', 'germinates in ') + p.germDays + L(' dní', ' days') : '', p.germTemp ? p.germTemp + ' °C' : '']).filter(Boolean).join(' · ');
+    const chosen = GP.state.plants.filter(p => p.sowPlan), done = GP.state.taskDone;
+    const tag = p => { const st = plantStatus(p); return st ? '<span class="tag">' + esc(GP.statusLabel(st)) + '</span>' : ''; };
+    // what is needed for the job: depth, temperature, spacing…
+    const details = (p, s) => [
+      p.depth ? L('hloubka ', 'depth ') + p.depth + ' cm' : '',
+      s.f.key !== 'plantMonths' && p.germTemp ? L('teplota klíčení ', 'germination at ') + p.germTemp + ' °C' : '',
+      s.f.key !== 'plantMonths' && p.germDays ? L('klíčí ', 'germinates in ') + p.germDays + L(' dní', ' days') : '',
+      p.spacing ? L('spon ', 'spacing ') + p.spacing + ' cm' : '',
+      p.support ? L('opora: ', 'support: ') + GP.optLabel(GP.PLANT_OPTS.support, p.support) : ''].filter(Boolean).join(' · ');
     const sec = s => {
-      const ps = list.filter(p => sowMonths(p, s).includes(m)).sort((a, b) => GP.plantName(a).localeCompare(GP.plantName(b), 'cs'));
+      const ps = chosen.filter(p => sowMonths(p, s).includes(m)).sort((a, b) => GP.plantName(a).localeCompare(GP.plantName(b), 'cs'));
       return '<div class="panel cal-sec"><h3>' + s.icon + ' ' + esc(L(s.f.task[0], s.f.task[1])) + ' <span class="muted">(' + ps.length + ')</span></h3>' +
         (ps.length ? '<ul class="tasks">' + ps.map(p => {
-          const key = 'sow:' + p.id + ':' + s.f.key, d = done[doneKey(key, m)], h = hint(p, s);
+          const key = 'sow:' + p.id + ':' + s.f.key, d = done[doneKey(key, m)], h = details(p, s);
+          const note = String(p.planting || '').split('\n')[0];
           return '<li class="' + (d ? 'done' : '') + '"><label><input type="checkbox" data-done="' + esc(key) + '" data-m="' + m + '"' + (d ? ' checked' : '') + '> <a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a></label> ' + tag(p) +
-            (h ? '<div class="small muted pre">' + esc(h) + '</div>' : '') + '</li>';
+            (h ? '<div class="small">' + esc(h) + '</div>' : '') + (note ? '<div class="small muted">' + esc(note.length > 160 ? note.slice(0, 157) + '…' : note) + '</div>' : '') + '</li>';
         }).join('') + '</ul>' : '<p class="muted small">' + L('Nic', 'Nothing') + '</p>') + '</div>';
     };
-    // whole year at a glance: when to sow inside, sow outside, plant out
-    const now = new Date().getMonth() + 1;
-    const rows = list.map(p => ({ p, first: Math.min(99, ...SOW().flatMap(s => sowMonths(p, s))) })).sort((a, b) => a.first - b.first || GP.plantName(a.p).localeCompare(GP.plantName(b.p), 'cs'));
-    const year = !rows.length ? '' : '<div class="panel"><h3>' + L('Celý rok', 'Whole year') + '</h3><div class="year-wrap"><table class="year"><thead><tr><th></th>' +
+
+    // plant selection: the whole catalog with the months of sowing and planting; ticked = in the plan above
+    const now = new Date().getMonth() + 1, list = pickList();
+    const rows = list.map(p => ({ p, first: Math.min(99, ...SOW().flatMap(s => sowMonths(p, s))) }))
+      .sort((a, b) => a.first - b.first || GP.plantName(a.p).localeCompare(GP.plantName(b.p), 'cs'));
+    const opt = (v, t, cur) => '<option value="' + esc(v) + '"' + (cur === v ? ' selected' : '') + '>' + esc(t) + '</option>';
+    const sel = (k, opts) => '<select data-p="' + k + '">' + opts + '</select>';
+    const allOn = list.length && list.every(p => p.sowPlan), someOn = list.some(p => p.sowPlan);
+    const filterRow = '<tr class="filter-row"><th class="pick"></th>' +
+      '<th><input type="search" data-p="q" placeholder="' + L('Hledat…', 'Search…') + '" value="' + esc(pick.q) + '"></th>' +
+      '<th class="hide-sm">' + sel('type', opt('', L('Vše', 'All'), pick.type) + GP.PLANT_TYPES.map(t => opt(t[0], L(t[1], t[2]), pick.type)).join('')) + '</th>' +
+      '<th class="hide-sm">' + sel('purpose', opt('', L('Vše', 'All'), pick.purpose) + GP.PLANT_OPTS.purpose.map(o => opt(o[0], L(o[1], o[2]), pick.purpose)).join('') + opt('_none', L('nevyplněno', 'not set'), pick.purpose)) + '</th>' +
+      '<th class="hide-sm">' + sel('crop', opt('', L('Vše', 'All'), pick.crop) + GP.PLANT_OPTS.crop.map(o => opt(o[0], L(o[1], o[2]), pick.crop)).join('') + opt('_none', L('bez užitku', 'none'), pick.crop)) + '</th>' +
+      '<th colspan="12">' + sel('only', opt('', L('Všechny rostliny', 'All plants'), pick.only) + opt('dated', L('Jen s termínem výsevu / výsadby', 'Only with a sowing / planting time'), pick.only) + opt('picked', L('Jen vybrané do plánu', 'Only picked for the plan'), pick.only)) + '</th></tr>';
+    const year = '<div class="panel"><h3>✅ ' + L('Výběr rostlin', 'Plant selection') + ' <span class="muted">(' + L('v plánu ', 'in the plan ') + chosen.length + ')</span></h3>' +
+      '<p class="small muted">' + L('Zaškrtnuté rostliny se objeví nahoře jako úkoly v daných měsících. ', 'Ticked plants show up above as tasks in their months. ') +
+        SOW().map(s => s.icon + ' ' + L(s.f.task[0], s.f.task[1])).join(' · ') + '</p>' +
+      '<div class="year-wrap"><table class="year pick-year"><thead>' + filterRow + '<tr><th class="pick"><input type="checkbox" data-pickall title="' + L('Vybrat vše zobrazené', 'Pick all shown') + '"' + (allOn ? ' checked' : '') + (someOn && !allOn ? ' data-some' : '') + '></th>' +
+      '<th>' + L('Název', 'Name') + '</th><th class="hide-sm">' + L('Typ', 'Type') + '</th><th class="hide-sm">' + L('Funkce', 'Purpose') + '</th><th class="hide-sm">' + L('Užitek', 'Crop') + '</th>' +
       [...Array(12)].map((_, i) => '<th class="' + (i + 1 === now ? 'now' : '') + (i + 1 === m ? ' sel' : '') + '">' + GP.monthShort(i + 1) + '</th>').join('') + '</tr></thead><tbody>' +
-      rows.map(({ p }) => '<tr><td class="nm"><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a></td>' + [...Array(12)].map((_, i) => {
-        const icons = SOW().filter(s => sowMonths(p, s).includes(i + 1)).map(s => s.icon).join('');
-        return '<td class="' + (i + 1 === now ? 'now' : '') + (icons ? ' sow' : '') + '" title="' + esc(GP.monthName(i + 1)) + '">' + icons + '</td>';
-      }).join('') + '</tr>').join('') + '</tbody></table></div>' +
-      '<p class="small muted">' + SOW().map(s => s.icon + ' ' + L(s.f.task[0], s.f.task[1])).join(' · ') + '</p></div>';
-    return '<div class="row gap list-tools"><label class="small">' + L('Zobrazit:', 'Show:') + ' <select data-c="sow">' +
-      [['', L('co je potřeba zasadit (bez vysazených stromů a keřů)', 'what needs planting (no trees and shrubs already planted)')], ['veg', L('jen zelenina, bylinky a letničky', 'vegetables, herbs and annuals only')], ['all', L('celý katalog', 'whole catalog')]]
-        .map(([v, t]) => '<option value="' + v + '"' + ((cal.sow || '') === v ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select></label>' +
-      '<span class="small muted">' + list.length + ' ' + L(list.length === 1 ? 'rostlina' : list.length >= 2 && list.length <= 4 ? 'rostliny' : 'rostlin', list.length === 1 ? 'plant' : 'plants') +
-        ' ' + L('s termínem výsevu nebo výsadby', 'with a sowing or planting time') + '</span></div>' +
+      (rows.map(({ p }) => '<tr class="' + (p.sowPlan ? 'row-picked' : '') + '"><td class="pick"><input type="checkbox" data-sowplan="' + p.id + '"' + (p.sowPlan ? ' checked' : '') + '></td>' +
+        '<td class="nm"><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a>' + tag(p) + '</td>' +
+        '<td class="hide-sm small">' + esc(GP.typeLabel(p.type)) + '</td><td class="hide-sm small">' + esc(GP.optLabel(GP.PLANT_OPTS.purpose, p.purpose)) + '</td><td class="hide-sm small">' + esc(GP.optLabel(GP.PLANT_OPTS.crop, p.crop)) + '</td>' +
+        [...Array(12)].map((_, i) => {
+          const icons = SOW().filter(s => sowMonths(p, s).includes(i + 1)).map(s => s.icon).join('');
+          return '<td class="' + (i + 1 === now ? 'now' : '') + (icons ? ' sow' : '') + '" title="' + esc(GP.monthName(i + 1)) + '">' + icons + '</td>';
+        }).join('') + '</tr>').join('') ||
+        '<tr><td colspan="17" class="muted small">' + L('Žádná rostlina neodpovídá filtru.', 'No plant matches the filter.') + '</td></tr>') +
+      '</tbody></table></div><p class="small muted">' + list.length + ' ' + plantsWord(list.length) + ' · ' +
+        L('Prázdný řádek = termíny výsevu a výsadby nejsou vyplněné (karta rostliny → Výsadba → Kdy sázet a vysévat).', 'Empty row = no sowing and planting times yet (plant card → Planting → When to plant and sow).') + '</p></div>';
+
+    return (chosen.length ? '' : '<p class="panel small">' + L('Plán je zatím prázdný – rostliny vyberte dole ve Výběru rostlin.', 'The plan is empty so far – pick plants in the Plant selection below.') + '</p>') +
       '<div class="cal-secs" id="agenda">' + SOW().map(sec).join('') + '</div>' + year;
   }
 
@@ -219,8 +249,8 @@
       if (cal.view === 'year') return html + '<div class="panel">' + yearView(cal.garden) + '</div>';
       html += '<div class="month-tabs">' + [...Array(12)].map((_, i) => '<button class="' + (cal.month === i + 1 ? 'on' : '') + (new Date().getMonth() === i ? ' now' : '') + '" data-month="' + (i + 1) + '">' + esc(GP.monthName(i + 1)) + '</button>').join('') + '</div>';
       if (sowing) return html + plantingPage(cal.month) +
-        '<p class="muted small">' + L('Termíny výsevu a výsadby jsou na kartě rostliny (Výsadba → Kdy sázet a vysévat). Vysazené stromy, keře a trvalky se tu neukazují – zelenina, bylinky a letničky ano, protože se sejí každý rok. Odškrtnutí platí pro letošní rok.',
-          'Sowing and planting times are on the plant card (Planting → When to plant and sow). Trees, shrubs and perennials already planted are not shown – vegetables, herbs and annuals are, as they are sown every year. Ticks apply to the current year.') + '</p>';
+        '<p class="muted small">' + L('Termíny a údaje (hloubka, spon, klíčení) jsou na kartě rostliny v sekci Výsadba. Odškrtnutí úkolu platí pro letošní rok.',
+          'Times and details (depth, spacing, germination) are on the plant card under Planting. Ticks apply to the current year.') + '</p>';
       html += monthPage(cal.month, cal.garden) +
         '<div class="panel"><h3>+ ' + L('Vlastní opakovaný úkol', 'Custom recurring task') + '</h3><div class="form" id="newtask">' +
         '<label class="field"><span class="lbl">' + L('Úkol', 'Task') + '</span><input type="text" data-t="title" placeholder="' + L('např. Vyčistit okapy, objednat mulč…', 'e.g. Clean gutters, order mulch…') + '"></label>' +
@@ -236,8 +266,29 @@
       root.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { cal.view = b.dataset.view; GP.render(); });
       const gs = root.querySelector('[data-c=garden]');
       if (gs) gs.onchange = e => { cal.garden = e.target.value; GP.render(); };
-      const ss = root.querySelector('[data-c=sow]');
-      if (ss) ss.onchange = e => { cal.sow = e.target.value; GP.render(); };
+      // plant selection of the planting plan
+      root.querySelectorAll('[data-p]').forEach(el => {
+        if (el.type === 'search') el.oninput = () => {
+          pick.q = el.value; GP.render();
+          const s = document.querySelector('[data-p=q]');
+          if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); }
+        };
+        else el.onchange = () => { pick[el.dataset.p] = el.value; GP.render(); };
+      });
+      const pa = root.querySelector('[data-pickall]');
+      if (pa) {
+        pa.indeterminate = pa.hasAttribute('data-some');
+        pa.onchange = () => {
+          for (const p of pickList()) if (pa.checked) p.sowPlan = true; else delete p.sowPlan;
+          GP.save(); GP.render();
+        };
+      }
+      root.querySelectorAll('[data-sowplan]').forEach(c => c.onchange = () => {
+        const p = GP.byId('plants', c.dataset.sowplan);
+        if (!p) return;
+        if (c.checked) p.sowPlan = true; else delete p.sowPlan;
+        GP.save(); GP.render();
+      });
       const agenda = root.querySelector('#agenda');
       if (!agenda) return;
       GP.bindAgenda(agenda);
