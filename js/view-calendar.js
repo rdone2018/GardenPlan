@@ -144,16 +144,24 @@
     const pls = GP.state.placements.filter(pl => pl.status === 'planted' && (!gardenId || pl.gardenId === gardenId));
     const monthsOf = p => mode === 'bloom' ? p.bloomMonths || [] : mode === 'harvest' ? p.harvestMonths || []
       : careFields().flatMap(f => GP.careTerms(p, f.key).flatMap(t => t.months || []));
-    const plants = [...new Set(pls.map(pl => pl.plantId))].map(id => GP.byId('plants', id)).filter(p => p && monthsOf(p).length)
+    // flowering and ripening have the Type · Purpose · Crop columns with filters
+    const typed = mode === 'bloom' || mode === 'harvest';
+    const all = [...new Set(pls.map(pl => pl.plantId))].map(id => GP.byId('plants', id)).filter(p => p && monthsOf(p).length);
+    const plants = all.filter(p => !typed || filterMatch(yf, p))
       .sort((a, b) => Math.min(...monthsOf(a)) - Math.min(...monthsOf(b)) || GP.plantName(a).localeCompare(GP.plantName(b), 'cs'));
-    if (!plants.length) return '<p class="muted">' + (mode === 'bloom' ? L('Žádná vysazená rostlina nemá vyplněnou dobu kvetení.', 'No planted plant has flowering months.')
+    if (!all.length) return '<p class="muted">' + (mode === 'bloom' ? L('Žádná vysazená rostlina nemá vyplněnou dobu kvetení.', 'No planted plant has flowering months.')
       : mode === 'harvest' ? L('Žádná vysazená rostlina nemá vyplněnou dobu zrání.', 'No planted plant has ripening months.')
+      : pls.length ? L('Žádná vysazená rostlina nemá vyplněné měsíce péče.', 'No planted plant has care months.')
       : L('Zatím nejsou žádné rostliny v zahradách.', 'No plants in gardens yet.')) + '</p>';
     const now = new Date().getMonth() + 1;
-    let html = '<div class="year-wrap"><table class="year"><thead><tr><th></th>' + [...Array(12)].map((_, i) => '<th class="' + (i + 1 === now ? 'now' : '') + '">' + GP.monthShort(i + 1) + '</th>').join('') + '</tr></thead><tbody>';
+    const months = [...Array(12)].map((_, i) => '<th class="' + (i + 1 === now ? 'now' : '') + '">' + GP.monthShort(i + 1) + '</th>').join('');
+    let html = '<div class="year-wrap"><table class="year"><thead>' + (typed
+      ? '<tr class="filter-row">' + filterCells(yf, 'data-yf') + '<th colspan="12"></th></tr><tr>' + typeHeads() + months + '</tr>'
+      : '<tr><th></th>' + months + '</tr>') + '</thead><tbody>';
+    if (!plants.length) html += '<tr><td colspan="16" class="muted small">' + L('Žádná rostlina neodpovídá filtru.', 'No plant matches the filter.') + '</td></tr>';
     for (const p of plants) {
       const hex = GP.colorHex(p) || '#d36f9a', ms = monthsOf(p);
-      html += '<tr><td class="nm"><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a></td>';
+      html += '<tr><td class="nm"><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a></td>' + (typed ? typeCells(p) : '');
       for (let m = 1; m <= 12; m++) {
         const cell = mode === 'bloom' ? (ms.includes(m) ? flower(hex) : '') : mode === 'harvest' ? (ms.includes(m) ? '🍎' : '')
           : '<span class="ci">' + careFields().filter(f => GP.careTerms(p, f.key).some(t => (t.months || []).includes(m))).map(f => f.icon).join('') + '</span>';
@@ -176,19 +184,30 @@
   // most advanced status of the plant in any garden ('' = not in a garden)
   const plantStatus = p => ['planted', 'planned', 'wish'].find(st => GP.state.placements.some(pl => pl.plantId === p.id && pl.status === st)) || '';
   const plantsWord = n => L(n === 1 ? 'rostlina' : n >= 2 && n <= 4 ? 'rostliny' : 'rostlin', n === 1 ? 'plant' : 'plants');
-  // filters of the plant selection, the same as in the catalog
-  const pick = { q: '', type: '', purpose: '', crop: '', only: '' };
+  // Name · Type · Purpose · Crop filters, the same as in the catalog; `f` holds the values, `attr` names the inputs
+  const pick = { q: '', type: '', purpose: '', crop: '', only: '' };   // plant selection of the planting plan
+  const yf = { q: '', type: '', purpose: '', crop: '' };               // whole-year flowering and ripening
+  function filterMatch(f, p) {
+    const q = GP.norm(f.q);
+    if (q && !GP.norm([p.name_cs, p.name_sk, p.name_en, p.name_la, p.cultivar].join(' ')).includes(q)) return false;
+    if (f.type && p.type !== f.type) return false;
+    if (f.purpose === '_none' ? p.purpose : f.purpose && p.purpose !== f.purpose && p.purpose !== 'both') return false;
+    if (f.crop && (p.crop || '') !== (f.crop === '_none' ? '' : f.crop)) return false;
+    return true;
+  }
+  const opt = (v, t, cur) => '<option value="' + esc(v) + '"' + (cur === v ? ' selected' : '') + '>' + esc(t) + '</option>';
+  const filterCells = (f, attr) => {
+    const sel = (k, opts) => '<select ' + attr + '="' + k + '">' + opts + '</select>';
+    return '<th><input type="search" ' + attr + '="q" placeholder="' + L('Hledat…', 'Search…') + '" value="' + esc(f.q) + '"></th>' +
+      '<th class="hide-sm">' + sel('type', opt('', L('Vše', 'All'), f.type) + GP.PLANT_TYPES.map(t => opt(t[0], L(t[1], t[2]), f.type)).join('')) + '</th>' +
+      '<th class="hide-sm">' + sel('purpose', opt('', L('Vše', 'All'), f.purpose) + GP.PLANT_OPTS.purpose.map(o => opt(o[0], L(o[1], o[2]), f.purpose)).join('') + opt('_none', L('nevyplněno', 'not set'), f.purpose)) + '</th>' +
+      '<th class="hide-sm">' + sel('crop', opt('', L('Vše', 'All'), f.crop) + GP.PLANT_OPTS.crop.map(o => opt(o[0], L(o[1], o[2]), f.crop)).join('') + opt('_none', L('bez užitku', 'none'), f.crop)) + '</th>';
+  };
+  const typeCells = p => '<td class="hide-sm small">' + esc(GP.typeLabel(p.type)) + '</td><td class="hide-sm small">' + esc(GP.optLabel(GP.PLANT_OPTS.purpose, p.purpose)) +
+    '</td><td class="hide-sm small">' + esc(GP.optLabel(GP.PLANT_OPTS.crop, p.crop)) + '</td>';
+  const typeHeads = () => '<th>' + L('Název', 'Name') + '</th><th class="hide-sm">' + L('Typ', 'Type') + '</th><th class="hide-sm">' + L('Funkce', 'Purpose') + '</th><th class="hide-sm">' + L('Užitek', 'Crop') + '</th>';
   function pickList() {
-    const q = GP.norm(pick.q);
-    return GP.state.plants.filter(p => {
-      if (q && !GP.norm([p.name_cs, p.name_sk, p.name_en, p.name_la, p.cultivar].join(' ')).includes(q)) return false;
-      if (pick.type && p.type !== pick.type) return false;
-      if (pick.purpose === '_none' ? p.purpose : pick.purpose && p.purpose !== pick.purpose && p.purpose !== 'both') return false;
-      if (pick.crop && (p.crop || '') !== (pick.crop === '_none' ? '' : pick.crop)) return false;
-      if (pick.only === 'dated' && !hasSow(p)) return false;
-      if (pick.only === 'picked' && !p.sowPlan) return false;
-      return true;
-    });
+    return GP.state.plants.filter(p => filterMatch(pick, p) && !(pick.only === 'dated' && !hasSow(p)) && !(pick.only === 'picked' && !p.sowPlan));
   }
 
   function plantingPage(m) {
@@ -216,24 +235,18 @@
     const now = new Date().getMonth() + 1, list = pickList();
     const rows = list.map(p => ({ p, first: Math.min(99, ...SOW().flatMap(s => sowMonths(p, s))) }))
       .sort((a, b) => a.first - b.first || GP.plantName(a.p).localeCompare(GP.plantName(b.p), 'cs'));
-    const opt = (v, t, cur) => '<option value="' + esc(v) + '"' + (cur === v ? ' selected' : '') + '>' + esc(t) + '</option>';
     const sel = (k, opts) => '<select data-p="' + k + '">' + opts + '</select>';
     const allOn = list.length && list.every(p => p.sowPlan), someOn = list.some(p => p.sowPlan);
-    const filterRow = '<tr class="filter-row"><th class="pick"></th>' +
-      '<th><input type="search" data-p="q" placeholder="' + L('Hledat…', 'Search…') + '" value="' + esc(pick.q) + '"></th>' +
-      '<th class="hide-sm">' + sel('type', opt('', L('Vše', 'All'), pick.type) + GP.PLANT_TYPES.map(t => opt(t[0], L(t[1], t[2]), pick.type)).join('')) + '</th>' +
-      '<th class="hide-sm">' + sel('purpose', opt('', L('Vše', 'All'), pick.purpose) + GP.PLANT_OPTS.purpose.map(o => opt(o[0], L(o[1], o[2]), pick.purpose)).join('') + opt('_none', L('nevyplněno', 'not set'), pick.purpose)) + '</th>' +
-      '<th class="hide-sm">' + sel('crop', opt('', L('Vše', 'All'), pick.crop) + GP.PLANT_OPTS.crop.map(o => opt(o[0], L(o[1], o[2]), pick.crop)).join('') + opt('_none', L('bez užitku', 'none'), pick.crop)) + '</th>' +
+    const filterRow = '<tr class="filter-row"><th class="pick"></th>' + filterCells(pick, 'data-p') +
       '<th colspan="12">' + sel('only', opt('', L('Všechny rostliny', 'All plants'), pick.only) + opt('dated', L('Jen s termínem výsevu / výsadby', 'Only with a sowing / planting time'), pick.only) + opt('picked', L('Jen vybrané do plánu', 'Only picked for the plan'), pick.only)) + '</th></tr>';
     const year = '<div class="panel"><h3>✅ ' + L('Výběr rostlin', 'Plant selection') + ' <span class="muted">(' + L('v plánu ', 'in the plan ') + chosen.length + ')</span></h3>' +
       '<p class="small muted">' + L('Zaškrtnuté rostliny se objeví nahoře jako úkoly v daných měsících. ', 'Ticked plants show up above as tasks in their months. ') +
         SOW().map(s => s.icon + ' ' + L(s.f.task[0], s.f.task[1])).join(' · ') + '</p>' +
       '<div class="year-wrap"><table class="year pick-year"><thead>' + filterRow + '<tr><th class="pick"><input type="checkbox" data-pickall title="' + L('Vybrat vše zobrazené', 'Pick all shown') + '"' + (allOn ? ' checked' : '') + (someOn && !allOn ? ' data-some' : '') + '></th>' +
-      '<th>' + L('Název', 'Name') + '</th><th class="hide-sm">' + L('Typ', 'Type') + '</th><th class="hide-sm">' + L('Funkce', 'Purpose') + '</th><th class="hide-sm">' + L('Užitek', 'Crop') + '</th>' +
+      typeHeads() +
       [...Array(12)].map((_, i) => '<th class="' + (i + 1 === now ? 'now' : '') + (i + 1 === m ? ' sel' : '') + '">' + GP.monthShort(i + 1) + '</th>').join('') + '</tr></thead><tbody>' +
       (rows.map(({ p }) => '<tr class="' + (p.sowPlan ? 'row-picked' : '') + '"><td class="pick"><input type="checkbox" data-sowplan="' + p.id + '"' + (p.sowPlan ? ' checked' : '') + '></td>' +
-        '<td class="nm"><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a>' + tag(p) + '</td>' +
-        '<td class="hide-sm small">' + esc(GP.typeLabel(p.type)) + '</td><td class="hide-sm small">' + esc(GP.optLabel(GP.PLANT_OPTS.purpose, p.purpose)) + '</td><td class="hide-sm small">' + esc(GP.optLabel(GP.PLANT_OPTS.crop, p.crop)) + '</td>' +
+        '<td class="nm"><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a>' + tag(p) + '</td>' + typeCells(p) +
         [...Array(12)].map((_, i) => {
           const icons = SOW().filter(s => sowMonths(p, s).includes(i + 1)).map(s => s.icon).join('');
           return '<td class="' + (i + 1 === now ? 'now' : '') + (icons ? ' sow' : '') + '" title="' + esc(GP.monthName(i + 1)) + '">' + icons + '</td>';
@@ -282,13 +295,14 @@
       const gs = root.querySelector('[data-c=garden]');
       if (gs) gs.onchange = e => { cal.garden = e.target.value; GP.render(); };
       // plant selection of the planting plan
-      root.querySelectorAll('[data-p]').forEach(el => {
+      // filters of the plant selection (data-p) and of whole-year flowering / ripening (data-yf)
+      for (const [attr, key, f] of [['data-p', 'p', pick], ['data-yf', 'yf', yf]]) root.querySelectorAll('[' + attr + ']').forEach(el => {
         if (el.type === 'search') el.oninput = () => {
-          pick.q = el.value; GP.render();
-          const s = document.querySelector('[data-p=q]');
+          f.q = el.value; GP.render();
+          const s = document.querySelector('[' + attr + '=q]');
           if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); }
         };
-        else el.onchange = () => { pick[el.dataset.p] = el.value; GP.render(); };
+        else el.onchange = () => { f[el.dataset[key]] = el.value; GP.render(); };
       });
       const pa = root.querySelector('[data-pickall]');
       if (pa) {
