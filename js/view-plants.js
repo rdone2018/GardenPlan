@@ -25,14 +25,29 @@
       if (filt.garden && !GP.state.placements.some(pl => pl.plantId === p.id && pl.gardenId === filt.garden && pl.status !== 'removed')) return false;
       return true;
     });
+    const name = (a, b) => GP.plantName(a).localeCompare(GP.plantName(b), 'cs');
+    // order of a choice list (strom, keř, …), plants without a value last, then by name
+    const inOrder = (key, list) => (a, b) => {
+      const ix = p => { const i = list.findIndex(o => o[0] === p[key]); return i < 0 ? 99 : i; };
+      return ix(a) - ix(b) || name(a, b);
+    };
     const by = {
-      name: (a, b) => GP.plantName(a).localeCompare(GP.plantName(b), 'cs'),
+      name,
       latin: (a, b) => (a.name_la || '~').localeCompare(b.name_la || '~'),
-      bloom: (a, b) => ((a.bloomMonths || [])[0] || 99) - ((b.bloomMonths || [])[0] || 99),
-      complete: (a, b) => GP.completeness(a) - GP.completeness(b)
+      type: inOrder('type', GP.PLANT_TYPES),
+      purpose: inOrder('purpose', GP.PLANT_OPTS.purpose),
+      crop: inOrder('crop', GP.PLANT_OPTS.crop),
+      bloom: (a, b) => ((a.bloomMonths || [])[0] || 99) - ((b.bloomMonths || [])[0] || 99) || name(a, b),
+      complete: (a, b) => GP.completeness(a) - GP.completeness(b) || name(a, b)
     };
     return list.sort(by[filt.sort] || by.name);
   }
+
+  const SORTS = () => [['name', L('název', 'name')], ['latin', L('latinsky', 'Latin')], ['type', L('typ', 'type')], ['purpose', L('funkce', 'purpose')],
+    ['crop', L('užitek', 'crop')], ['complete', L('vyplněnost', 'completeness')], ['bloom', L('doba květu', 'flowering')]];
+  // a column header that sorts the list when clicked
+  const sortTh = (key, label, cls) => '<th class="th-sort' + (filt.sort === key ? ' on' : '') + (cls ? ' ' + cls : '') + '" data-sort="' + key + '" title="' + L('Kliknutím seřadit', 'Click to sort') + '">' +
+    label + (filt.sort === key && key !== 'complete' ? ' ▲' : '') + '</th>';
 
   // One small bar per section of the plant card (basics, looks, planting, care); hover tells what is missing.
   const SECTIONS = () => [L('Základ', 'Basics'), L('Vzhled', 'Looks'), L('Výsadba', 'Planting'), L('Péče', 'Care')];
@@ -83,8 +98,7 @@
           opt('_unsure', L('Neurčené (?)', 'Unidentified (?)') + ' · ' + all.filter(p => p.unsure).length, filt.missing) +
           GP.PLANT_FIELDS.filter(f => f.core).map(f => opt(f.key, L('Chybí: ', 'Missing: ') + GP.fieldLabel(f), filt.missing)).join('')) + '</th></tr>';
       const anyFilter = ['q', 'type', 'purpose', 'crop', 'color', 'garden', 'missing'].some(k => filt[k]);
-      const filters = '<div class="row gap list-tools"><label class="small muted">' + L('Řadit:', 'Sort:') + ' <select data-f="sort">' + opt('name', L('název', 'name'), filt.sort) + opt('latin', L('latinsky', 'Latin'), filt.sort) +
-        opt('bloom', L('doba květu', 'flowering'), filt.sort) + opt('complete', L('vyplněnost', 'completeness'), filt.sort) + '</select></label>' +
+      const filters = '<div class="row gap list-tools"><label class="small muted">' + L('Řadit:', 'Sort:') + ' <select data-f="sort">' + SORTS().map(([k, label]) => opt(k, label, filt.sort)).join('') + '</select></label>' +
         (anyFilter ? '<button class="link small" data-act="nofilter">✕ ' + L('Zrušit filtry', 'Clear filters') + '</button>' : '') + '</div>';
       // gardens the plant grows in, with the number of pieces ("Zahrada (3 ks)")
       const gardensOf = p => {
@@ -103,7 +117,10 @@
           '<td>' + colorPills(p) + '</td>' +
           '<td class="hide-sm small">' + gardensOf(p) + '</td>' +
           '<td>' + sectionBars(p) + '</td></tr>').join('');
-      return head + filters + '<div class="panel flush"><table class="tbl plants"><thead><tr><th></th><th>' + L('Název', 'Name') + '</th><th class="hide-sm">' + L('Typ', 'Type') + '</th><th class="hide-sm">' + L('Funkce', 'Purpose') + '</th><th class="hide-sm">' + L('Užitek', 'Crop') + '</th><th>' + L('Barva květů', 'Flower colour') + '</th><th class="hide-sm">' + L('Zahrada', 'Garden') + '</th><th title="' + L('Vyplněnost sekcí karty', 'How complete each section of the card is') + '"><span class="sec-head">' + SECTIONS().map(s => '<span>' + esc(s) + '</span>').join('') + '</span></th></tr>' + filterRow + '</thead><tbody>' +
+      return head + filters + '<div class="panel flush"><table class="tbl plants"><thead><tr><th></th>' + sortTh(filt.sort === 'latin' ? 'latin' : 'name', filt.sort === 'latin' ? L('Název – latinsky', 'Name – Latin') : L('Název', 'Name')) +
+        sortTh('type', L('Typ', 'Type'), 'hide-sm') + sortTh('purpose', L('Funkce', 'Purpose'), 'hide-sm') + sortTh('crop', L('Užitek', 'Crop'), 'hide-sm') +
+        '<th>' + L('Barva květů', 'Flower colour') + '</th><th class="hide-sm">' + L('Zahrada', 'Garden') + '</th>' +
+        sortTh('complete', '<span class="sec-head">' + SECTIONS().map(s => '<span>' + esc(s) + '</span>').join('') + '</span>') + '</tr>' + filterRow + '</thead><tbody>' +
         (rows || '<tr><td colspan="8" class="muted">' + L('Nic neodpovídá filtru.', 'Nothing matches the filter.') + '</td></tr>') + '</tbody></table></div>' +
         '<p class="muted small">' + list.length + ' / ' + all.length + '</p>';
     },
@@ -126,6 +143,12 @@
       };
       const ex = root.querySelector('[data-act=export]');
       if (ex) ex.onclick = () => GP.ui.download('rostliny-' + new Date().toISOString().slice(0, 10) + '.csv', GP.csv.exportPlants(), 'text/csv;charset=utf-8');
+      // clicking "Název" again switches between the Czech and the Latin name
+      root.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => {
+        const k = th.dataset.sort;
+        filt.sort = k === 'name' && filt.sort === 'name' ? 'latin' : k === 'latin' ? 'name' : k;
+        GP.render();
+      });
       const nf = root.querySelector('[data-act=nofilter]');
       if (nf) nf.onclick = () => { for (const k of ['q', 'type', 'purpose', 'crop', 'color', 'garden', 'missing']) filt[k] = ''; GP.render(); };
       root.querySelectorAll('[data-f]').forEach(el => {

@@ -347,3 +347,6 @@ input.num { width: 4.5rem; }
 .tbl tr.filter-row select, .tbl tr.filter-row input { width: 100%; min-width: 5.5rem; font-size: .78rem; padding: .2rem .3rem; font-weight: 400; }
 .tbl tr.filter-row input { min-width: 9rem; }
 .tbl tr.filter-row select.on { border-color: var(--accent, #3e7b3a); background: #eef5e8; font-weight: 600; }
+.tbl th.th-sort { cursor: pointer; user-select: none; }
+.tbl th.th-sort:hover { color: var(--text, #2b2b26); }
+.tbl th.th-sort.on { color: var(--accent, #3e7b3a); }
