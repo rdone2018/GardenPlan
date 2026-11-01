@@ -7,23 +7,17 @@
   const taskFields = () => GP.PLANT_FIELDS.filter(f => f.task);
   const taskShown = (p, f) => !f.show || f.show(p);
 
-  // Everything that falls into month `m` (optionally for one garden).
+  // Care of what grows in the garden in month `m` (optionally for one garden): only plants planted out –
+  // sowing and planting are in the planting plan (plantingPage), which works with the whole catalog.
   GP.monthAgenda = function (m, gardenId) {
     const tasks = [], bloom = new Map(), harvest = new Map();
-    const pls = GP.state.placements.filter(pl => pl.status !== 'removed' && pl.status !== 'wish' && (!gardenId || pl.gardenId === gardenId));
+    const pls = GP.state.placements.filter(pl => pl.status === 'planted' && (!gardenId || pl.gardenId === gardenId));
     const seen = new Set();
     for (const pl of pls) {
       const p = GP.byId('plants', pl.plantId), g = GP.byId('gardens', pl.gardenId);
       if (!p || !g) continue;
       if ((p.bloomMonths || []).includes(m)) bloom.set(p.id, p);
       if ((p.harvestMonths || []).includes(m)) harvest.set(p.id, p);
-      for (const f of taskFields()) {
-        if (!taskShown(p, f) || !(p[f.key] || []).includes(m)) continue;
-        const key = 'sow:' + g.id + ':' + p.id + ':' + f.key;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        tasks.push({ key, kind: 'plant', field: f.key, plant: p, icon: f.icon, title: L(f.task[0], f.task[1]) + ' – ' + GP.plantName(p), garden: g, href: '#/plant/' + p.id });
-      }
       for (const f of careFields()) {
         GP.careTerms(p, f.key).forEach((c, i) => {
           if (!(c.months || []).includes(m)) return;
@@ -86,8 +80,7 @@
   // ---------- month page: overview of the work + sections Planting · Flowering · Ripening · Care ----------
   const nextMonth = m => m % 12 + 1;
   // kinds of work, in the order of the overview (only the ones that occur are shown)
-  const workKinds = () => [{ id: 'plant', icon: '🪴', label: L('Výsadba a výsev', 'Planting and sowing'), is: t => t.kind === 'plant' }]
-    .concat(careFields().map(f => ({ id: f.key, icon: f.icon || '•', label: GP.fieldLabel(f), is: t => t.kind === 'care' && t.field === f.key })))
+  const workKinds = () => careFields().map(f => ({ id: f.key, icon: f.icon || '•', label: GP.fieldLabel(f), is: t => t.kind === 'care' && t.field === f.key }))
     .concat([{ id: 'eq', icon: '⚙️', label: L('Technika', 'Equipment'), is: t => t.kind === 'eq' }, { id: 'task', icon: '📝', label: L('Vlastní úkoly', 'Custom tasks'), is: t => t.kind === 'task' }]);
 
   const tasksWord = n => L(n === 1 ? 'úkol' : n >= 2 && n <= 4 ? 'úkoly' : 'úkolů', n === 1 ? 'task' : 'tasks');
@@ -130,17 +123,11 @@
       return ts.length ? '<h4>' + k.icon + ' ' + esc(k.label) + ' <span class="muted">(' + ts.length + ')</span></h4><ul class="tasks">' +
         ts.map(t => li(t, t.plant ? GP.plantName(t.plant) : t.title)).join('') + '</ul>' : '';
     }).join('');
-    // planting: one group per kind ("🪴 Sázet ven", sowing outside / inside)
-    const plantingGroups = tasks => taskFields().map(f => {
-      const ts = tasks.filter(t => t.field === f.key);
-      return ts.length ? '<h4>' + f.icon + ' ' + esc(L(f.task[0], f.task[1])) + ' <span class="muted">(' + ts.length + ')</span></h4><ul class="tasks">' + ts.map(t => li(t, GP.plantName(t.plant))).join('') + '</ul>' : '';
-    }).join('');
     const plantLinks = (list, swatch) => list.length ? '<div class="pchips">' + list.map(p => '<a class="pchip" href="#/plant/' + p.id + '">' + (swatch ? GP.ui.swatch(GP.colorHex(p)) + ' ' : '') + esc(GP.plantName(p)) + '</a>').join('') + '</div>' : '';
     const sec = (icon, title, n, body, cls) => '<div class="panel cal-sec' + (cls ? ' ' + cls : '') + '"><h3>' + icon + ' ' + title + ' <span class="muted">(' + n + ')</span></h3>' +
       (body || '<p class="muted small">' + L('Nic', 'Nothing') + '</p>') + '</div>';
-    const planting = a.tasks.filter(t => t.kind === 'plant'), care = a.tasks.filter(t => t.kind === 'care'), other = a.tasks.filter(t => t.kind === 'eq' || t.kind === 'task');
+    const care = a.tasks.filter(t => t.kind === 'care'), other = a.tasks.filter(t => t.kind === 'eq' || t.kind === 'task');
     return overview(m, a, b) + '<div class="cal-secs" id="agenda">' +
-      sec('🪴', L('Výsadba a výsev', 'Planting and sowing'), planting.length, plantingGroups(planting)) +
       sec('🌸', L('Kvetení', 'Flowering'), a.bloom.length, plantLinks(a.bloom, true)) +
       sec('🍎', L('Zrání a sklizeň', 'Ripening and harvest'), a.harvest.length, plantLinks(a.harvest)) +
       sec('🧰', L('Péče', 'Care'), care.length + other.length, grouped(care) +
@@ -149,7 +136,7 @@
   }
 
   function yearView(gardenId) {
-    const pls = GP.state.placements.filter(pl => pl.status !== 'removed' && (!gardenId || pl.gardenId === gardenId));
+    const pls = GP.state.placements.filter(pl => pl.status === 'planted' && (!gardenId || pl.gardenId === gardenId));
     const plants = [...new Set(pls.map(pl => pl.plantId))].map(id => GP.byId('plants', id)).filter(Boolean)
       .sort((a, b) => ((a.bloomMonths || [])[0] || 99) - ((b.bloomMonths || [])[0] || 99));
     if (!plants.length) return '<p class="muted">' + L('Zatím nejsou žádné rostliny v zahradách.', 'No plants in gardens yet.') + '</p>';
@@ -160,13 +147,61 @@
       html += '<tr><td class="nm"><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a></td>';
       for (let m = 1; m <= 12; m++) {
         const b = (p.bloomMonths || []).includes(m), h = (p.harvestMonths || []).includes(m);
-        const care = taskFields().filter(f => taskShown(p, f) && (p[f.key] || []).includes(m)).map(f => f.icon).join('') +
-          careFields().filter(f => GP.careTerms(p, f.key).some(t => (t.months || []).includes(m))).map(f => f.icon).join('');
+        const care = careFields().filter(f => GP.careTerms(p, f.key).some(t => (t.months || []).includes(m))).map(f => f.icon).join('');
         html += '<td class="' + (m === now ? 'now' : '') + '"' + (b ? ' style="background:' + hex + '"' : '') + ' title="' + esc(GP.monthName(m)) + '">' + (h ? '🍎' : '') + '<span class="ci">' + care + '</span></td>';
       }
       html += '</tr>';
     }
-    return html + '</tbody></table></div><p class="small muted">' + L('Barva = kvete · 🍎 zrání · ', 'Colour = flowering · 🍎 ripening · ') + ['🪴 ' + L('výsadba ven', 'planting out'), '🌱 ' + L('výsev', 'sowing')].concat(careFields().map(f => f.icon + ' ' + GP.fieldLabel(f))).join(' · ') + '</p>';
+    return html + '</tbody></table></div><p class="small muted">' + L('Barva = kvete · 🍎 zrání · ', 'Colour = flowering · 🍎 ripening · ') + careFields().map(f => f.icon + ' ' + GP.fieldLabel(f)).join(' · ') + '</p>';
+  }
+
+  // ---------- planting plan: sowing and planting out, for any plant in the catalog ----------
+  // (vegetables mostly – they are sown every year, so they stay here even when planted)
+  const SOW = () => [['sowInMonths', '🏠'], ['sowOutMonths', '🌱'], ['plantMonths', '🪴']]
+    .map(([key, icon]) => ({ f: GP.PLANT_FIELDS.find(x => x.key === key), icon })).filter(s => s.f);
+  const resown = p => ['annual', 'biennial'].includes(p.type) || ['vegetable', 'herb'].includes(p.crop);
+  const sowMonths = (p, s) => (taskShown(p, s.f) && p[s.f.key]) || [];
+  // most advanced status of the plant in any garden ('' = not in a garden)
+  const plantStatus = p => ['planted', 'planned', 'wish'].find(st => GP.state.placements.some(pl => pl.plantId === p.id && pl.status === st)) || '';
+  function sowCandidates() {
+    return GP.state.plants.filter(p => SOW().some(s => sowMonths(p, s).length)).filter(p => {
+      if (cal.sow === 'veg' && !resown(p)) return false;
+      // a tree or shrub already in the ground is not planted again
+      return cal.sow === 'all' || plantStatus(p) !== 'planted' || resown(p);
+    });
+  }
+
+  function plantingPage(m) {
+    const list = sowCandidates(), done = GP.state.taskDone;
+    const tag = p => { const st = plantStatus(p); return '<span class="tag' + (st ? '' : ' muted') + '">' + esc(st ? GP.statusLabel(st) : L('není v zahradě', 'not in a garden')) + '</span>'; };
+    const hint = (p, s) => (s.f.key === 'plantMonths'
+      ? [p.spacing ? L('spon ', 'spacing ') + p.spacing + ' cm' : '', p.depth ? L('hloubka ', 'depth ') + p.depth + ' cm' : '']
+      : [p.germDays ? L('klíčí ', 'germinates in ') + p.germDays + L(' dní', ' days') : '', p.germTemp ? p.germTemp + ' °C' : '']).filter(Boolean).join(' · ');
+    const sec = s => {
+      const ps = list.filter(p => sowMonths(p, s).includes(m)).sort((a, b) => GP.plantName(a).localeCompare(GP.plantName(b), 'cs'));
+      return '<div class="panel cal-sec"><h3>' + s.icon + ' ' + esc(L(s.f.task[0], s.f.task[1])) + ' <span class="muted">(' + ps.length + ')</span></h3>' +
+        (ps.length ? '<ul class="tasks">' + ps.map(p => {
+          const key = 'sow:' + p.id + ':' + s.f.key, d = done[doneKey(key, m)], h = hint(p, s);
+          return '<li class="' + (d ? 'done' : '') + '"><label><input type="checkbox" data-done="' + esc(key) + '" data-m="' + m + '"' + (d ? ' checked' : '') + '> <a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a></label> ' + tag(p) +
+            (h ? '<div class="small muted pre">' + esc(h) + '</div>' : '') + '</li>';
+        }).join('') + '</ul>' : '<p class="muted small">' + L('Nic', 'Nothing') + '</p>') + '</div>';
+    };
+    // whole year at a glance: when to sow inside, sow outside, plant out
+    const now = new Date().getMonth() + 1;
+    const rows = list.map(p => ({ p, first: Math.min(99, ...SOW().flatMap(s => sowMonths(p, s))) })).sort((a, b) => a.first - b.first || GP.plantName(a.p).localeCompare(GP.plantName(b.p), 'cs'));
+    const year = !rows.length ? '' : '<div class="panel"><h3>' + L('Celý rok', 'Whole year') + '</h3><div class="year-wrap"><table class="year"><thead><tr><th></th>' +
+      [...Array(12)].map((_, i) => '<th class="' + (i + 1 === now ? 'now' : '') + (i + 1 === m ? ' sel' : '') + '">' + GP.monthShort(i + 1) + '</th>').join('') + '</tr></thead><tbody>' +
+      rows.map(({ p }) => '<tr><td class="nm"><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a></td>' + [...Array(12)].map((_, i) => {
+        const icons = SOW().filter(s => sowMonths(p, s).includes(i + 1)).map(s => s.icon).join('');
+        return '<td class="' + (i + 1 === now ? 'now' : '') + (icons ? ' sow' : '') + '" title="' + esc(GP.monthName(i + 1)) + '">' + icons + '</td>';
+      }).join('') + '</tr>').join('') + '</tbody></table></div>' +
+      '<p class="small muted">' + SOW().map(s => s.icon + ' ' + L(s.f.task[0], s.f.task[1])).join(' · ') + '</p></div>';
+    return '<div class="row gap list-tools"><label class="small">' + L('Zobrazit:', 'Show:') + ' <select data-c="sow">' +
+      [['', L('co je potřeba zasadit (bez vysazených stromů a keřů)', 'what needs planting (no trees and shrubs already planted)')], ['veg', L('jen zelenina, bylinky a letničky', 'vegetables, herbs and annuals only')], ['all', L('celý katalog', 'whole catalog')]]
+        .map(([v, t]) => '<option value="' + v + '"' + ((cal.sow || '') === v ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select></label>' +
+      '<span class="small muted">' + list.length + ' ' + L(list.length === 1 ? 'rostlina' : list.length >= 2 && list.length <= 4 ? 'rostliny' : 'rostlin', list.length === 1 ? 'plant' : 'plants') +
+        ' ' + L('s termínem výsevu nebo výsadby', 'with a sowing or planting time') + '</span></div>' +
+      '<div class="cal-secs" id="agenda">' + SOW().map(sec).join('') + '</div>' + year;
   }
 
   // coming to the calendar from elsewhere always starts at the current month
@@ -176,12 +211,17 @@
   GP.views.calendar = {
     render() {
       if (!inCalendar) { cal.month = new Date().getMonth() + 1; cal.view = 'month'; inCalendar = true; }
-      const gsel = '<select data-c="garden"><option value="">' + L('Všechny zahrady', 'All gardens') + '</option>' + GP.state.gardens.map(g => '<option value="' + g.id + '"' + (cal.garden === g.id ? ' selected' : '') + '>' + esc(g.name) + '</option>').join('') + '</select>';
-      let html = '<div class="head"><h1>' + L('Kalendář péče', 'Care calendar') + '</h1><div class="row gap">' + gsel +
-        '<button class="seg' + (cal.view === 'month' ? ' on' : '') + '" data-view="month">' + L('Měsíc', 'Month') + '</button><button class="seg' + (cal.view === 'year' ? ' on' : '') + '" data-view="year">' + L('Celý rok', 'Whole year') + '</button></div></div>';
+      const sowing = cal.view === 'sow';
+      const gsel = sowing ? '' : '<select data-c="garden"><option value="">' + L('Všechny zahrady', 'All gardens') + '</option>' + GP.state.gardens.map(g => '<option value="' + g.id + '"' + (cal.garden === g.id ? ' selected' : '') + '>' + esc(g.name) + '</option>').join('') + '</select>';
+      const seg = (v, label) => '<button class="seg' + (cal.view === v ? ' on' : '') + '" data-view="' + v + '">' + label + '</button>';
+      let html = '<div class="head"><h1>' + (sowing ? L('Plán výsevu a výsadby', 'Sowing and planting plan') : L('Kalendář péče', 'Care calendar')) + '</h1><div class="row gap">' + gsel +
+        seg('month', '🧰 ' + L('Péče – měsíc', 'Care – month')) + seg('year', L('Péče – celý rok', 'Care – whole year')) + seg('sow', '🪴 ' + L('Plán výsadby', 'Planting plan')) + '</div></div>';
       if (cal.view === 'year') return html + '<div class="panel">' + yearView(cal.garden) + '</div>';
-      html += '<div class="month-tabs">' + [...Array(12)].map((_, i) => '<button class="' + (cal.month === i + 1 ? 'on' : '') + (new Date().getMonth() === i ? ' now' : '') + '" data-month="' + (i + 1) + '">' + esc(GP.monthName(i + 1)) + '</button>').join('') + '</div>' +
-        monthPage(cal.month, cal.garden) +
+      html += '<div class="month-tabs">' + [...Array(12)].map((_, i) => '<button class="' + (cal.month === i + 1 ? 'on' : '') + (new Date().getMonth() === i ? ' now' : '') + '" data-month="' + (i + 1) + '">' + esc(GP.monthName(i + 1)) + '</button>').join('') + '</div>';
+      if (sowing) return html + plantingPage(cal.month) +
+        '<p class="muted small">' + L('Termíny výsevu a výsadby jsou na kartě rostliny (Výsadba → Kdy sázet a vysévat). Vysazené stromy, keře a trvalky se tu neukazují – zelenina, bylinky a letničky ano, protože se sejí každý rok. Odškrtnutí platí pro letošní rok.',
+          'Sowing and planting times are on the plant card (Planting → When to plant and sow). Trees, shrubs and perennials already planted are not shown – vegetables, herbs and annuals are, as they are sown every year. Ticks apply to the current year.') + '</p>';
+      html += monthPage(cal.month, cal.garden) +
         '<div class="panel"><h3>+ ' + L('Vlastní opakovaný úkol', 'Custom recurring task') + '</h3><div class="form" id="newtask">' +
         '<label class="field"><span class="lbl">' + L('Úkol', 'Task') + '</span><input type="text" data-t="title" placeholder="' + L('např. Vyčistit okapy, objednat mulč…', 'e.g. Clean gutters, order mulch…') + '"></label>' +
         '<label class="field"><span class="lbl">' + L('Zahrada', 'Garden') + '</span><select data-t="gardenId"><option value="">' + L('všechny', 'all') + '</option>' + GP.state.gardens.map(g => '<option value="' + g.id + '"' + (cal.garden === g.id ? ' selected' : '') + '>' + esc(g.name) + '</option>').join('') + '</select></label>' +
@@ -194,13 +234,18 @@
     mount(root) {
       root.querySelectorAll('[data-month]').forEach(b => b.onclick = () => { cal.month = +b.dataset.month; GP.render(); });
       root.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { cal.view = b.dataset.view; GP.render(); });
-      root.querySelector('[data-c=garden]').onchange = e => { cal.garden = e.target.value; GP.render(); };
+      const gs = root.querySelector('[data-c=garden]');
+      if (gs) gs.onchange = e => { cal.garden = e.target.value; GP.render(); };
+      const ss = root.querySelector('[data-c=sow]');
+      if (ss) ss.onchange = e => { cal.sow = e.target.value; GP.render(); };
       const agenda = root.querySelector('#agenda');
       if (!agenda) return;
       GP.bindAgenda(agenda);
       // a tick changes the "done" part of the overview bars
-      agenda.addEventListener('change', e => { if (e.target.dataset.done) GP.render(); });
-      const form = root.querySelector('#newtask'), draft = { months: [cal.month] };
+      if (cal.view === 'month') agenda.addEventListener('change', e => { if (e.target.dataset.done) GP.render(); });
+      const form = root.querySelector('#newtask');
+      if (!form) return;
+      const draft = { months: [cal.month] };
       GP.ui.bind(form, draft);
       form.addEventListener('change', e => { if (e.target.dataset.t) draft[e.target.dataset.t] = e.target.value; });
       form.addEventListener('input', e => { if (e.target.dataset.t) draft[e.target.dataset.t] = e.target.value; });

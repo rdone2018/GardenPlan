@@ -392,3 +392,5 @@ input.num { width: 4.5rem; }
 @media (max-width: 640px) { .sum-row { grid-template-columns: 1fr; gap: .15rem; } }
 .my { display: inline-flex; gap: .25rem; }
 .my select { width: auto; min-width: 0; }
+.year td.sow { background: #eef5e8; }
+.year th.sel { background: var(--green-soft); }
