@@ -394,3 +394,7 @@ input.num { width: 4.5rem; }
 .my select { width: auto; min-width: 0; }
 .year td.sow { background: #eef5e8; }
 .year th.sel { background: var(--green-soft); }
+
+/* flower icon in the flower colour (calendar) */
+.flw { width: 1.15rem; height: 1.15rem; vertical-align: -.2rem; }
+.seg .flw { width: 1rem; height: 1rem; }

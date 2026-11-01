@@ -135,24 +135,36 @@
       '</div>';
   }
 
-  function yearView(gardenId) {
+  // a small flower in the colour of the plant's flowers (an emoji cannot be recoloured)
+  const flower = hex => '<svg class="flw" viewBox="0 0 20 20" aria-hidden="true"><g fill="' + esc(hex) + '" stroke="rgba(0,0,0,.25)" stroke-width=".6">' +
+    [0, 72, 144, 216, 288].map(a => '<circle cx="10" cy="5" r="4" transform="rotate(' + a + ' 10 10)"/>').join('') + '</g><circle cx="10" cy="10" r="2.6" fill="#f2c94c"/></svg>';
+
+  // Whole-year table of planted plants; mode: 'year' = care, 'bloom' = flowering, 'harvest' = ripening
+  function yearView(gardenId, mode) {
     const pls = GP.state.placements.filter(pl => pl.status === 'planted' && (!gardenId || pl.gardenId === gardenId));
-    const plants = [...new Set(pls.map(pl => pl.plantId))].map(id => GP.byId('plants', id)).filter(Boolean)
-      .sort((a, b) => ((a.bloomMonths || [])[0] || 99) - ((b.bloomMonths || [])[0] || 99));
-    if (!plants.length) return '<p class="muted">' + L('Zatím nejsou žádné rostliny v zahradách.', 'No plants in gardens yet.') + '</p>';
+    const monthsOf = p => mode === 'bloom' ? p.bloomMonths || [] : mode === 'harvest' ? p.harvestMonths || []
+      : careFields().flatMap(f => GP.careTerms(p, f.key).flatMap(t => t.months || []));
+    const plants = [...new Set(pls.map(pl => pl.plantId))].map(id => GP.byId('plants', id)).filter(p => p && monthsOf(p).length)
+      .sort((a, b) => Math.min(...monthsOf(a)) - Math.min(...monthsOf(b)) || GP.plantName(a).localeCompare(GP.plantName(b), 'cs'));
+    if (!plants.length) return '<p class="muted">' + (mode === 'bloom' ? L('Žádná vysazená rostlina nemá vyplněnou dobu kvetení.', 'No planted plant has flowering months.')
+      : mode === 'harvest' ? L('Žádná vysazená rostlina nemá vyplněnou dobu zrání.', 'No planted plant has ripening months.')
+      : L('Zatím nejsou žádné rostliny v zahradách.', 'No plants in gardens yet.')) + '</p>';
     const now = new Date().getMonth() + 1;
     let html = '<div class="year-wrap"><table class="year"><thead><tr><th></th>' + [...Array(12)].map((_, i) => '<th class="' + (i + 1 === now ? 'now' : '') + '">' + GP.monthShort(i + 1) + '</th>').join('') + '</tr></thead><tbody>';
     for (const p of plants) {
-      const hex = GP.colorHex(p) || '#bbb';
+      const hex = GP.colorHex(p) || '#d36f9a', ms = monthsOf(p);
       html += '<tr><td class="nm"><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a></td>';
       for (let m = 1; m <= 12; m++) {
-        const b = (p.bloomMonths || []).includes(m), h = (p.harvestMonths || []).includes(m);
-        const care = careFields().filter(f => GP.careTerms(p, f.key).some(t => (t.months || []).includes(m))).map(f => f.icon).join('');
-        html += '<td class="' + (m === now ? 'now' : '') + '"' + (b ? ' style="background:' + hex + '"' : '') + ' title="' + esc(GP.monthName(m)) + '">' + (h ? '🍎' : '') + '<span class="ci">' + care + '</span></td>';
+        const cell = mode === 'bloom' ? (ms.includes(m) ? flower(hex) : '') : mode === 'harvest' ? (ms.includes(m) ? '🍎' : '')
+          : '<span class="ci">' + careFields().filter(f => GP.careTerms(p, f.key).some(t => (t.months || []).includes(m))).map(f => f.icon).join('') + '</span>';
+        html += '<td class="' + (m === now ? 'now' : '') + '" title="' + esc(GP.monthName(m)) + '">' + cell + '</td>';
       }
       html += '</tr>';
     }
-    return html + '</tbody></table></div><p class="small muted">' + L('Barva = kvete · 🍎 zrání · ', 'Colour = flowering · 🍎 ripening · ') + careFields().map(f => f.icon + ' ' + GP.fieldLabel(f)).join(' · ') + '</p>';
+    const legend = mode === 'bloom' ? flower('#d36f9a') + ' ' + L('kvete – v barvě květů', 'in flower – in the flower colour')
+      : mode === 'harvest' ? '🍎 ' + L('zraje / sklizeň', 'ripening / harvest')
+      : careFields().map(f => f.icon + ' ' + GP.fieldLabel(f)).join(' · ');
+    return html + '</tbody></table></div><p class="small muted">' + plants.length + ' ' + plantsWord(plants.length) + ' · ' + legend + '</p>';
   }
 
   // ---------- planting plan: sowing and planting out of plants picked from the whole catalog ----------
@@ -244,9 +256,12 @@
       const sowing = cal.view === 'sow';
       const gsel = sowing ? '' : '<select data-c="garden"><option value="">' + L('Všechny zahrady', 'All gardens') + '</option>' + GP.state.gardens.map(g => '<option value="' + g.id + '"' + (cal.garden === g.id ? ' selected' : '') + '>' + esc(g.name) + '</option>').join('') + '</select>';
       const seg = (v, label) => '<button class="seg' + (cal.view === v ? ' on' : '') + '" data-view="' + v + '">' + label + '</button>';
-      let html = '<div class="head"><h1>' + (sowing ? L('Plán výsevu a výsadby', 'Sowing and planting plan') : L('Kalendář péče', 'Care calendar')) + '</h1><div class="row gap">' + gsel +
-        seg('month', '🧰 ' + L('Péče – měsíc', 'Care – month')) + seg('year', L('Péče – celý rok', 'Care – whole year')) + seg('sow', '🪴 ' + L('Plán výsadby', 'Planting plan')) + '</div></div>';
-      if (cal.view === 'year') return html + '<div class="panel">' + yearView(cal.garden) + '</div>';
+      const title = sowing ? L('Plán výsevu a výsadby', 'Sowing and planting plan') : cal.view === 'bloom' ? L('Kvetení – celý rok', 'Flowering – whole year')
+        : cal.view === 'harvest' ? L('Zrání – celý rok', 'Ripening – whole year') : L('Kalendář péče', 'Care calendar');
+      let html = '<div class="head"><h1>' + title + '</h1><div class="row gap">' + gsel +
+        seg('sow', '🪴 ' + L('Plán výsadby', 'Planting plan')) + seg('month', '🧰 ' + L('Péče – měsíc', 'Care – month')) + seg('year', L('Péče – celý rok', 'Care – whole year')) +
+        seg('bloom', flower('#d36f9a') + ' ' + L('Kvetení – celý rok', 'Flowering – whole year')) + seg('harvest', '🍎 ' + L('Zrání – celý rok', 'Ripening – whole year')) + '</div></div>';
+      if (['year', 'bloom', 'harvest'].includes(cal.view)) return html + '<div class="panel">' + yearView(cal.garden, cal.view) + '</div>';
       html += '<div class="month-tabs">' + [...Array(12)].map((_, i) => '<button class="' + (cal.month === i + 1 ? 'on' : '') + (new Date().getMonth() === i ? ' now' : '') + '" data-month="' + (i + 1) + '">' + esc(GP.monthName(i + 1)) + '</button>').join('') + '</div>';
       if (sowing) return html + plantingPage(cal.month) +
         '<p class="muted small">' + L('Termíny a údaje (hloubka, spon, klíčení) jsou na kartě rostliny v sekci Výsadba. Odškrtnutí úkolu platí pro letošní rok.',
