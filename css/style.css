@@ -390,3 +390,5 @@ input.num { width: 4.5rem; }
 .pchip { display: inline-flex; align-items: center; gap: .25rem; padding: .15rem .5rem; border: 1px solid var(--line); border-radius: 999px; font-size: .85rem; background: #fff; text-decoration: none; }
 .pchip:hover { border-color: var(--green); }
 @media (max-width: 640px) { .sum-row { grid-template-columns: 1fr; gap: .15rem; } }
+.my { display: inline-flex; gap: .25rem; }
+.my select { width: auto; min-width: 0; }

@@ -91,7 +91,7 @@
       '<div class="form">' +
       '<label class="field"><span class="lbl">' + L('Zahrada', 'Garden') + '</span><select data-g>' + gardens.map(g => '<option value="' + g.id + '">' + esc(g.name) + '</option>').join('') + '</select></label>' +
       '<label class="field"><span class="lbl">' + L('Stav', 'Status') + '</span><select data-s>' + GP.STATUSES.filter(s => s[0] !== 'removed').map(s => '<option value="' + s[0] + '"' + (s[0] === 'planted' ? ' selected' : '') + '>' + esc(L(s[1], s[2])) + '</option>').join('') + '</select></label>' +
-      '<label class="field"><span class="lbl">' + L('Vysazeno v měsíci', 'Planted in') + '</span><input type="month" data-d placeholder="RRRR-MM"></label></div>' +
+      '<label class="field"><span class="lbl">' + L('Vysazeno v měsíci', 'Planted in') + '</span>' + GP.ui.monthYear('data-d', '') + '</label></div>' +
       '<p class="small muted">' + L('Měsíc je nepovinný a dá se později upravit v zahradě (záložka Rostliny), i každé rostlině zvlášť. Rostliny, které už v zahradě jsou, se přeskočí. Místo na plánu zahrady jim určíte později.',
         'The month is optional and can be changed later in the garden (Plants tab), for each plant separately too. Plants already in the garden are skipped. Their place on the garden plan is set later.') + '</p>' +
       '<div class="row gap"><button class="btn primary" data-ok>' + L('Přidat', 'Add') + '</button><button class="btn" data-x>' + L('Zrušit', 'Cancel') + '</button></div></div>';
@@ -417,7 +417,7 @@
             (issues.length ? '<div class="small warn-text">' + issues.map(esc).join('<br>') + '</div>' : '') + '</td>' +
             '<td><input type="text" data-k="position" value="' + esc(pl.position) + '"></td>' +
             '<td><select data-k="status">' + GP.STATUSES.map(s => '<option value="' + s[0] + '"' + (pl.status === s[0] ? ' selected' : '') + '>' + esc(L(s[1], s[2])) + '</option>').join('') + '</select></td>' +
-            '<td><input type="month" data-k="plantedDate" placeholder="RRRR-MM" value="' + esc((pl.plantedDate || '').slice(0, 7)) + '"></td>' +
+            '<td>' + GP.ui.monthYear('data-k="plantedDate"', (pl.plantedDate || '').slice(0, 7)) + '</td>' +
             '<td><input type="text" class="num" data-k="count" value="' + esc(pl.count) + '"></td>' +
             '<td><input type="text" data-k="notes" value="' + esc(pl.notes) + '"></td>' +
             '<td><button class="link danger" data-delpl="' + pl.id + '">✕</button></td></tr>';

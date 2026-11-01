@@ -26,6 +26,26 @@
     return html + '</div>';
   };
 
+  // Month + year as two plain lists (the browser's month input is awkward for past years). The value
+  // ("2026-04", or just "2015" when the month is not known) sits in a hidden input with `attr`, which
+  // fires a bubbling "change" like any other field, so existing handlers read it as e.target.value.
+  GP.ui.monthYear = function (attr, value) {
+    const [y, m] = String(value || '').split('-'), now = new Date().getFullYear();
+    let html = '<span class="my"><select class="my-m" title="' + L('Měsíc', 'Month') + '"><option value="">' + L('měsíc', 'month') + '</option>';
+    for (let i = 1; i <= 12; i++) html += '<option value="' + i + '"' + (+m === i ? ' selected' : '') + '>' + esc(GP.monthName(i)) + '</option>';
+    html += '</select><select class="my-y" title="' + L('Rok', 'Year') + '"><option value="">' + L('rok', 'year') + '</option>';
+    for (let i = now + 1; i >= 1950; i--) html += '<option' + (+y === i ? ' selected' : '') + '>' + i + '</option>';
+    return html + '</select><input type="hidden" ' + attr + ' value="' + esc(value ? GP.ui.monthYearValue(y, m) : '') + '"></span>';
+  };
+  GP.ui.monthYearValue = (y, m) => (y ? y + (m ? '-' + String(+m).padStart(2, '0') : '') : '');
+  document.addEventListener('change', e => {
+    const box = e.target.closest && e.target.closest('.my');
+    if (!box || e.target.type === 'hidden') return;
+    const hidden = box.querySelector('input[type=hidden]');
+    hidden.value = GP.ui.monthYearValue(box.querySelector('.my-y').value, box.querySelector('.my-m').value);
+    hidden.dispatchEvent(new Event('change', { bubbles: true }));
+  }, true);
+
   // Render one labelled field; `path` is the property path on the bound object.
   GP.ui.field = function (f, value, path) {
     path = path || f.key;
