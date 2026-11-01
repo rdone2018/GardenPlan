@@ -3,7 +3,7 @@
 // changes not yet confirmed by the server stay there and are sent again after a reload or a server restart.
 window.GP = window.GP || {};
 (function (GP) {
-  const DB_NAME = 'gardenplan', STORE = 'state', KEY = 'main', SYNC_KEY = 'sync';
+  const DB_NAME = 'gardenplan', STORE = 'state', KEY = 'main', SYNC_KEY = 'sync', UNSENT_KEY = 'unsent';
   const COLLECTIONS = ['gardens', 'plants', 'placements', 'equipment', 'tasks'];
   const BATCH = 400000;       // max. characters of plant/garden data in one save request (proxies often allow 1 MB)
   let db = null, saveTimer = null, retryTimer = null;
@@ -190,14 +190,31 @@ window.GP = window.GP || {};
     return syncing;
   }
 
+  // ---------- unsent copy kept aside ----------
+  function keepUnsent(local) {
+    GP.hasUnsent = true;
+    if (!db) return;
+    try { db.transaction(STORE, 'readwrite').objectStore(STORE).put({ time: Date.now(), state: local }, UNSENT_KEY); } catch (e) { console.error(e); }
+  }
+  GP.unsent = {
+    get: () => (db ? readKey(UNSENT_KEY) : Promise.resolve(null)),
+    drop() {
+      GP.hasUnsent = false;
+      if (db) try { db.transaction(STORE, 'readwrite').objectStore(STORE).delete(UNSENT_KEY); } catch (e) { console.error(e); }
+    }
+  };
+
   // Server data arrived (first load or after an outage): take it, plus local changes it does not have yet.
   function useServerState(serverState, local) {
     GP.storageMode = 'server';
     GP.offline = false;
     snap = snapshot(Object.assign(emptyState(), serverState));
     // a copy saved by an older version has no fingerprints: it cannot tell its own changes from stale items, so it
-    // would overwrite newer data from other devices – the server copy wins then
+    // would overwrite newer data from other devices – the server copy is shown and the local one is kept aside
+    // for the Data page, where the user picks what to bring back (never thrown away)
     const pending = syncInfo.dirty && local && syncInfo.base;
+    if (syncInfo.dirty && local && !syncInfo.base) keepUnsent(local);
+    if (!pending) syncInfo.dirty = false;
     GP.state = pending ? mergeLocal(serverState, local) : Object.assign(emptyState(), serverState);
     setBase();
     syncInfo.mode = 'server';
@@ -222,7 +239,7 @@ window.GP = window.GP || {};
     try { db = await openDb(); } catch (e) { console.error('IndexedDB unavailable', e); }
     let local = null;
     try {
-      if (db) { local = await readKey(KEY); syncInfo = Object.assign(syncInfo, await readKey(SYNC_KEY)); }
+      if (db) { local = await readKey(KEY); syncInfo = Object.assign({ mode: 'local', dirty: false }, await readKey(SYNC_KEY)); GP.hasUnsent = !!(await readKey(UNSENT_KEY)); }
     } catch (e) { console.error('Storage unavailable', e); }
 
     const r = await fetchState();

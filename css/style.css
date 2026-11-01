@@ -335,3 +335,8 @@ input.num { width: 4.5rem; }
   .saved { display: none; }
   .saved.warn { display: inline; }
 }
+
+/* changes kept aside on the Data page */
+.unsent-list { display: flex; flex-direction: column; gap: .35rem; margin: .6rem 0 .8rem; max-height: 22rem; overflow: auto; }
+.unsent-list label { align-items: center; }
+.unsent-list img { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; }
