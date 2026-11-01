@@ -360,7 +360,7 @@ input.num { width: 4.5rem; }
 /* ticking rows (catalog: add to garden, garden list: set date / status) */
 .tbl th.pick, .tbl td.pick { width: 1.6rem; padding-left: .5rem; padding-right: 0; }
 .tbl td.pick input, .tbl th.pick input { width: 1rem; height: 1rem; cursor: pointer; }
-.tbl tr.picked td { background: #eef5e8; }
+.tbl tr.row-picked td { background: #eef5e8; }
 .pick-bar { display: inline-flex; align-items: center; gap: .5rem; }
 .list-tools { flex-wrap: wrap; }
 .list-tools label { display: inline-flex; align-items: center; gap: .35rem; }

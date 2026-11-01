@@ -168,7 +168,7 @@
         }
         return [...by].map(([gid, n]) => { const g = GP.byId('gardens', gid); return g ? esc(g.name) + (n > 1 ? ' <span class="muted">(' + n + ' ' + L('ks', 'pcs') + ')</span>' : '') : ''; }).filter(Boolean).join(', ');
       };
-      const rows = list.map(p => '<tr data-href="#/plant/' + p.id + '"' + (picked.has(p.id) ? ' class="picked"' : '') + '><td class="pick"><input type="checkbox" data-pick="' + p.id + '"' + (picked.has(p.id) ? ' checked' : '') + '></td><td class="thumb">' + (p.photo ? '<img src="' + p.photo + '" alt="" loading="lazy">' : '') + '</td>' +
+      const rows = list.map(p => '<tr data-href="#/plant/' + p.id + '"' + (picked.has(p.id) ? ' class="row-picked"' : '') + '><td class="pick"><input type="checkbox" data-pick="' + p.id + '"' + (picked.has(p.id) ? ' checked' : '') + '></td><td class="thumb">' + (p.photo ? '<img src="' + p.photo + '" alt="" loading="lazy">' : '') + '</td>' +
           '<td><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a><div class="italic small muted">' + esc(p.name_la) + '</div></td>' +
           '<td class="hide-sm">' + esc(GP.typeLabel(p.type)) + '</td>' +
           '<td class="hide-sm small">' + esc(GP.optLabel(GP.PLANT_OPTS.purpose, p.purpose)) + '</td>' +

@@ -490,7 +490,7 @@
       bar.querySelectorAll('button').forEach(b => b.disabled = !n);
       all.checked = n && n === boxes.length;
       all.indeterminate = n > 0 && n < boxes.length;
-      boxes.forEach(b => b.closest('tr').classList.toggle('picked', b.checked));
+      boxes.forEach(b => b.closest('tr').classList.toggle('row-picked', b.checked));
     };
     boxes.forEach(b => b.onchange = sync);
     all.onchange = () => { boxes.forEach(b => b.checked = all.checked); sync(); };
