@@ -236,13 +236,28 @@ window.GP = window.GP || {};
 
   // ---------- public API ----------
   GP.load = async function () {
-    try { db = await openDb(); } catch (e) { console.error('IndexedDB unavailable', e); }
+    // ask the server right away; the browser copy is read meanwhile
+    const server = fetchState();
+    // Browser storage sometimes stalls (seen in Edge): give it a few seconds, then go on without it. It is then not
+    // touched at all this time, so an unsent copy in it is not overwritten either.
+    const LATE = {};
+    const inTime = p => Promise.race([p, new Promise(resolve => setTimeout(() => resolve(LATE), 5000))]);
     let local = null;
     try {
-      if (db) { local = await readKey(KEY); syncInfo = Object.assign({ mode: 'local', dirty: false }, await readKey(SYNC_KEY)); GP.hasUnsent = !!(await readKey(UNSENT_KEY)); }
-    } catch (e) { console.error('Storage unavailable', e); }
+      db = await inTime(openDb());
+      if (db === LATE) throw new Error('IndexedDB did not open within 5 s');
+      const rows = await inTime(Promise.all([readKey(KEY), readKey(SYNC_KEY), readKey(UNSENT_KEY)]));
+      if (rows === LATE) throw new Error('IndexedDB did not answer within 5 s');
+      const [l, si, un] = rows;
+      local = l;
+      syncInfo = Object.assign({ mode: 'local', dirty: false }, si);
+      GP.hasUnsent = !!un;
+    } catch (e) {
+      console.error('Storage unavailable', e);
+      db = null;
+    }
 
-    const r = await fetchState();
+    const r = await server;
     if (r.state) return useServerState(r.state, local);
 
     if (r.reachable || syncInfo.mode === 'server') {
