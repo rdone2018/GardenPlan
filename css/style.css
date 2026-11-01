@@ -350,3 +350,10 @@ input.num { width: 4.5rem; }
 .tbl th.th-sort { cursor: pointer; user-select: none; }
 .tbl th.th-sort:hover { color: var(--text, #2b2b26); }
 .tbl th.th-sort.on { color: var(--accent, #3e7b3a); }
+/* month strips (flowering / ripening), one cell per month */
+.mstrip { display: inline-grid; grid-template-columns: repeat(12, 7px); gap: 1px; align-items: end; height: 12px; vertical-align: middle; }
+.mstrip i { height: 3px; border-radius: 1px; background: #dcd9cf; }
+.mstrip i.on { height: 12px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); }
+.mstrip.cover { height: 16px; }
+.mstrip.cover i.on { height: 16px; }
+.tbl tfoot td { border-top: 2px solid var(--line); border-bottom: 0; background: #faf9f5; vertical-align: middle; }

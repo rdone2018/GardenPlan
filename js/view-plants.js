@@ -1,7 +1,8 @@
 // Plant catalog (shared by all gardens) and the plant card: 0 basics, 1 before planting, 2 care, plus plantings.
 (function (GP) {
   const L = GP.L, esc = GP.esc;
-  const filt = GP.plantFilter = { q: '', type: '', purpose: '', crop: '', color: '', missing: '', garden: '', sort: 'name' };
+  const FILTERS = ['q', 'type', 'purpose', 'crop', 'color', 'bloomIn', 'harvestIn', 'garden', 'missing'];
+  const filt = GP.plantFilter = { q: '', type: '', purpose: '', crop: '', color: '', bloomIn: '', harvestIn: '', missing: '', garden: '', sort: 'name' };
 
   GP.newPlant = function (data) {
     const p = Object.assign({ id: GP.uid(), created: new Date().toISOString().slice(0, 10), v: GP.PLANT_VERSION }, data || {});
@@ -19,6 +20,8 @@
       if (filt.purpose === '_none' ? p.purpose : filt.purpose && p.purpose !== filt.purpose && p.purpose !== 'both') return false;
       if (filt.crop && (p.crop || '') !== (filt.crop === '_none' ? '' : filt.crop)) return false;
       if (filt.color && !(p.flowerColors || []).includes(filt.color)) return false;
+      if (filt.bloomIn && !(p.bloomMonths || []).includes(+filt.bloomIn)) return false;
+      if (filt.harvestIn && !(p.harvestMonths || []).includes(+filt.harvestIn)) return false;
       if (filt.missing === '_any' && GP.completeness(p) === 100) return false;
       if (filt.missing === '_unsure' && !p.unsure) return false;
       if (filt.missing && filt.missing[0] !== '_' &&GP.isFilled(p, GP.PLANT_FIELDS.find(f => f.key === filt.missing))) return false;
@@ -37,14 +40,15 @@
       type: inOrder('type', GP.PLANT_TYPES),
       purpose: inOrder('purpose', GP.PLANT_OPTS.purpose),
       crop: inOrder('crop', GP.PLANT_OPTS.crop),
-      bloom: (a, b) => ((a.bloomMonths || [])[0] || 99) - ((b.bloomMonths || [])[0] || 99) || name(a, b),
+      bloom: (a, b) => Math.min(99, ...(a.bloomMonths || [])) - Math.min(99, ...(b.bloomMonths || [])) || name(a, b),
+      harvest: (a, b) => Math.min(99, ...(a.harvestMonths || [])) - Math.min(99, ...(b.harvestMonths || [])) || name(a, b),
       complete: (a, b) => GP.completeness(a) - GP.completeness(b) || name(a, b)
     };
     return list.sort(by[filt.sort] || by.name);
   }
 
   const SORTS = () => [['name', L('název', 'name')], ['latin', L('latinsky', 'Latin')], ['type', L('typ', 'type')], ['purpose', L('funkce', 'purpose')],
-    ['crop', L('užitek', 'crop')], ['complete', L('vyplněnost', 'completeness')], ['bloom', L('doba květu', 'flowering')]];
+    ['crop', L('užitek', 'crop')], ['bloom', L('doba květu', 'flowering')], ['harvest', L('doba zrání', 'ripening')], ['complete', L('vyplněnost', 'completeness')]];
   // a column header that sorts the list when clicked
   const sortTh = (key, label, cls) => '<th class="th-sort' + (filt.sort === key ? ' on' : '') + (cls ? ' ' + cls : '') + '" data-sort="' + key + '" title="' + L('Kliknutím seřadit', 'Click to sort') + '">' +
     label + (filt.sort === key && key !== 'complete' ? ' ▲' : '') + '</th>';
@@ -59,6 +63,21 @@
       const title = names[i] + ': ' + s.pct + ' %' + (s.missing.length ? ' · ' + L('chybí', 'missing') + ': ' + s.missing.join(', ') : ' ✓');
       return '<span class="sb' + (s.pct === 100 ? ' full' : '') + '" title="' + esc(title) + '"><i style="width:' + Math.max(s.pct, 0) + '%;background:' + color + '"></i></span>';
     }).join('') + '</span>';
+  }
+
+  // Twelve small cells, one per month (I–XII), the given months filled in – shows at a glance when a plant flowers or ripens.
+  const BLOOM = '#d36f9a', HARVEST = '#c2552d';
+  function monthStrip(months, color, title) {
+    const set = new Set(months || []);
+    if (!set.size) return '';
+    return '<span class="mstrip" title="' + esc(title + ': ' + GP.formatMonths(months)) + '">' +
+      [...Array(12)].map((_, i) => '<i' + (set.has(i + 1) ? ' class="on" style="background:' + color + '"' : '') + '></i>').join('') + '</span>';
+  }
+  // Same strip for the whole list: the stronger the colour, the more plants in that month; empty months are gaps.
+  function coverageStrip(list, key, color, verb) {
+    const n = [...Array(12)].map((_, i) => list.filter(p => (p[key] || []).includes(i + 1)).length), max = Math.max(1, ...n);
+    return '<span class="mstrip cover">' + n.map((c, i) => '<i title="' + esc(GP.monthName(i + 1) + ': ' + verb + ' ' + c) + '"' +
+      (c ? ' class="on" style="background:' + color + ';opacity:' + (0.25 + 0.75 * c / max).toFixed(2) + '"' : '') + '></i>').join('') + '</span>';
   }
 
   // Flower colours as coloured labels ("bílá", "růžová"); dark text on light colours, white on dark ones.
@@ -93,11 +112,12 @@
         '<th class="hide-sm">' + sel('purpose', opt('', L('Vše', 'All'), filt.purpose) + GP.PLANT_OPTS.purpose.map(o => opt(o[0], L(o[1], o[2]), filt.purpose)).join('') + opt('_none', L('nevyplněno', 'not set'), filt.purpose)) + '</th>' +
         '<th class="hide-sm">' + sel('crop', opt('', L('Vše', 'All'), filt.crop) + GP.PLANT_OPTS.crop.map(o => opt(o[0], L(o[1], o[2]), filt.crop)).join('') + opt('_none', L('bez užitku', 'none'), filt.crop)) + '</th>' +
         '<th>' + sel('color', opt('', L('Vše', 'All'), filt.color) + GP.PLANT_OPTS.flowerColors.map(o => opt(o[0], L(o[1], o[2]), filt.color)).join('')) + '</th>' +
+        ['bloomIn', 'harvestIn'].map(f => '<th class="hide-sm">' + sel(f, opt('', L('Vše', 'All'), filt[f]) + [...Array(12)].map((_, i) => opt(String(i + 1), GP.monthName(i + 1), filt[f])).join('')) + '</th>').join('') +
         '<th class="hide-sm">' + sel('garden', opt('', L('Vše', 'All'), filt.garden) + GP.state.gardens.map(g => opt(g.id, g.name, filt.garden)).join('')) + '</th>' +
         '<th>' + sel('missing', opt('', L('Vše', 'All'), filt.missing) + opt('_any', L('Nekompletní', 'Incomplete'), filt.missing) +
           opt('_unsure', L('Neurčené (?)', 'Unidentified (?)') + ' · ' + all.filter(p => p.unsure).length, filt.missing) +
           GP.PLANT_FIELDS.filter(f => f.core).map(f => opt(f.key, L('Chybí: ', 'Missing: ') + GP.fieldLabel(f), filt.missing)).join('')) + '</th></tr>';
-      const anyFilter = ['q', 'type', 'purpose', 'crop', 'color', 'garden', 'missing'].some(k => filt[k]);
+      const anyFilter = FILTERS.some(k => filt[k]);
       const filters = '<div class="row gap list-tools"><label class="small muted">' + L('Řadit:', 'Sort:') + ' <select data-f="sort">' + SORTS().map(([k, label]) => opt(k, label, filt.sort)).join('') + '</select></label>' +
         (anyFilter ? '<button class="link small" data-act="nofilter">✕ ' + L('Zrušit filtry', 'Clear filters') + '</button>' : '') + '</div>';
       // gardens the plant grows in, with the number of pieces ("Zahrada (3 ks)")
@@ -115,13 +135,20 @@
           '<td class="hide-sm small">' + esc(GP.optLabel(GP.PLANT_OPTS.purpose, p.purpose)) + '</td>' +
           '<td class="hide-sm small">' + esc(GP.optLabel(GP.PLANT_OPTS.crop, p.crop)) + '</td>' +
           '<td>' + colorPills(p) + '</td>' +
+          '<td class="hide-sm">' + monthStrip(p.bloomMonths, GP.colorHex(p) || BLOOM, L('Kvete', 'Flowers')) + '</td>' +
+          '<td class="hide-sm">' + monthStrip(p.harvestMonths, HARVEST, L('Zraje', 'Ripens')) + '</td>' +
           '<td class="hide-sm small">' + gardensOf(p) + '</td>' +
           '<td>' + sectionBars(p) + '</td></tr>').join('');
+      // how the plants in the list cover the year – gaps show months with nothing in flower / to harvest
+      const cover = list.length < 2 ? '' : '<tfoot><tr class="cover-row"><td></td><td class="small">' + L('Pokrytí roku', 'Year coverage') + ' <span class="muted">(' + list.length + ')</span></td>' +
+        '<td class="hide-sm" colspan="4"></td><td class="hide-sm">' + coverageStrip(list, 'bloomMonths', BLOOM, L('kvete', 'in flower')) + '</td>' +
+        '<td class="hide-sm">' + coverageStrip(list, 'harvestMonths', HARVEST, L('zraje', 'ripening')) + '</td><td class="hide-sm" colspan="2"></td></tr></tfoot>';
       return head + filters + '<div class="panel flush"><table class="tbl plants"><thead><tr><th></th>' + sortTh(filt.sort === 'latin' ? 'latin' : 'name', filt.sort === 'latin' ? L('Název – latinsky', 'Name – Latin') : L('Název', 'Name')) +
         sortTh('type', L('Typ', 'Type'), 'hide-sm') + sortTh('purpose', L('Funkce', 'Purpose'), 'hide-sm') + sortTh('crop', L('Užitek', 'Crop'), 'hide-sm') +
-        '<th>' + L('Barva květů', 'Flower colour') + '</th><th class="hide-sm">' + L('Zahrada', 'Garden') + '</th>' +
+        '<th>' + L('Barva květů', 'Flower colour') + '</th>' + sortTh('bloom', L('Kvete', 'Flowers'), 'hide-sm') + sortTh('harvest', L('Zrání', 'Ripens'), 'hide-sm') +
+        '<th class="hide-sm">' + L('Zahrada', 'Garden') + '</th>' +
         sortTh('complete', '<span class="sec-head">' + SECTIONS().map(s => '<span>' + esc(s) + '</span>').join('') + '</span>') + '</tr>' + filterRow + '</thead><tbody>' +
-        (rows || '<tr><td colspan="8" class="muted">' + L('Nic neodpovídá filtru.', 'Nothing matches the filter.') + '</td></tr>') + '</tbody></table></div>' +
+        (rows || '<tr><td colspan="10" class="muted">' + L('Nic neodpovídá filtru.', 'Nothing matches the filter.') + '</td></tr>') + '</tbody>' + cover + '</table></div>' +
         '<p class="muted small">' + list.length + ' / ' + all.length + '</p>';
     },
     mount(root) {
@@ -150,7 +177,7 @@
         GP.render();
       });
       const nf = root.querySelector('[data-act=nofilter]');
-      if (nf) nf.onclick = () => { for (const k of ['q', 'type', 'purpose', 'crop', 'color', 'garden', 'missing']) filt[k] = ''; GP.render(); };
+      if (nf) nf.onclick = () => { for (const k of FILTERS) filt[k] = ''; GP.render(); };
       root.querySelectorAll('[data-f]').forEach(el => {
         el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', () => {
           filt[el.dataset.f] = el.value;
