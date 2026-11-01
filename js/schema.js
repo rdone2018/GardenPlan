@@ -146,7 +146,9 @@
     toxicFor: [['people', 'pro lidi', 'for people'], ['animals', 'pro zvířata (psi, kočky)', 'for animals (dogs, cats)']],
     pollination: [['self', 'samosprašná', 'self-fertile', '^samospras|self'], ['partial', 'částečně samosprašná', 'partly self-fertile', 'castec|partly|partial'],
       ['cross', 'potřebuje opylovače', 'needs a pollinator', 'cizospras|opylov|cross|needs']],
-    wildlife: [['bees', 'včely', 'bees'], ['butterflies', 'motýli', 'butterflies'], ['birds', 'ptáci', 'birds']]
+    // "none" = checked and there is nothing (different from not filled in yet)
+    wildlife: [['bees', 'včely', 'bees', 'vcel|bee|cmel'], ['butterflies', 'motýli', 'butterflies', 'motyl|butterfl'], ['birds', 'ptáci', 'birds', 'ptac|ptak|bird'],
+      ['none', 'žádný (nic zvláštního)', 'none (nothing special)', 'zadn|^ne$|^nie$|none|^no$']]
   };
   GP.optLabel = (list, v) => { const o = list.find(x => x[0] === v); return o ? L(o[1], o[2]) : ''; };
   GP.optHex = (list, v) => { const o = list.find(x => x[0] === v); return o ? o[4] : null; };
