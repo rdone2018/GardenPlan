@@ -66,5 +66,13 @@
     else GP.refresh().then(changed => { if (changed) GP.render(); });
   });
 
-  GP.load().then(GP.render);
+  GP.load().then(() => {
+    const t = performance.now();
+    GP.render();
+    GP.startTimes.render = Math.round(performance.now() - t);
+    GP.startTimes.total = Math.round(performance.now());
+    console.log('GardenPlan start (ms):', JSON.stringify(GP.startTimes));
+    // a copy kept aside that no longer differs from the server is not worth a warning
+    if (GP.hasUnsent) GP.unsent.check().then(gone => { if (gone) GP.render(); });
+  });
 })(window.GP);

@@ -39,11 +39,18 @@ async function storePhoto(conn, name, obj) {
   return obj;
 }
 
-// rewritten (optional) collects [collection, id, photo address] for photos moved to the photos table
-async function upsert(conn, name, objects, rewritten) {
+// rewritten (optional) collects [collection, id, photo address] for photos moved to the photos table.
+// newer (optional): an item edited later on another device (its edit time mt is later) is not overwritten by an
+// older edit; [collection, stored item] goes back to the browser instead.
+async function upsert(conn, name, objects, rewritten, newer) {
   const c = COLLECTIONS[name];
   for (let obj of objects) {
     if (!obj || typeof obj.id !== 'string' || !obj.id) continue;
+    if (newer && obj.mt) {
+      const [row] = await conn.query('SELECT data FROM ' + c.table + ' WHERE id=? FOR UPDATE', [str(obj.id, 32)]);
+      const cur = row && JSON.parse(row.data);
+      if (cur && (cur.mt || 0) > obj.mt) { newer.push([name, cur]); continue; }
+    }
     const stored = await storePhoto(conn, name, obj);
     if (rewritten && stored.photo !== obj.photo) rewritten.push([name, obj.id, stored.photo]);
     obj = stored;
@@ -103,7 +110,8 @@ app.get('/api/state', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// Changes since the last save: { upsert: {plants: [..]}, delete: {plants: [ids]}, meta: {settings, taskDone, version} }
+// Changes since the last save: { upsert: {plants: [..]}, delete: {plants: [ids]}, seen: {plants: {id: mt}}, meta: {settings, taskDone, version} }
+// Answers { ok, photos: [[collection, id, address]], newer: [[collection, item]] } – newer = edited later elsewhere, kept.
 app.post('/api/sync', async (req, res, next) => {
   const t0 = Date.now(), kb = Math.round((Number(req.headers['content-length']) || 0) / 1024);
   try {
@@ -111,22 +119,33 @@ app.post('/api/sync', async (req, res, next) => {
     const counts = Object.keys(COLLECTIONS).map(n => [n, ((body.upsert || {})[n] || []).length, ((body.delete || {})[n] || []).length]).filter(c => c[1] || c[2]);
     const what = counts.map(([n, u, d]) => n + ' ' + u + (d ? '/-' + d : '')).join(', ') || 'meta';
     console.log(new Date().toISOString(), 'sync start', kb + ' kB', what);
-    const photos = [];
+    const photos = [], newer = [];
     await inTransaction(async conn => {
       for (const name of Object.keys(COLLECTIONS)) {
         const up = body.upsert && body.upsert[name];
-        if (Array.isArray(up) && up.length) await upsert(conn, name, up, photos);
+        if (Array.isArray(up) && up.length) await upsert(conn, name, up, photos, newer);
         const del = body.delete && body.delete[name];
         if (Array.isArray(del) && del.length) {
-          const ids = del.map(id => str(id, 32));
+          let ids = del.map(id => str(id, 32));
+          // seen: edit times of the versions the browser deleted – an item edited later on another device stays
+          const seen = body.seen && body.seen[name];
+          if (seen) {
+            const kept = new Set();
+            for (const r of await conn.query('SELECT id, data FROM ' + COLLECTIONS[name].table + ' WHERE id IN (?) FOR UPDATE', [ids])) {
+              const cur = JSON.parse(r.data);
+              if ((cur.mt || 0) > (seen[r.id] || 0)) { kept.add(r.id); newer.push([name, cur]); }
+            }
+            ids = ids.filter(id => !kept.has(id));
+          }
+          if (!ids.length) continue;
           await conn.query('DELETE FROM ' + COLLECTIONS[name].table + ' WHERE id IN (?)', [ids]);
           if (PHOTO_KINDS.includes(name)) await conn.query('DELETE FROM photos WHERE kind=? AND id IN (?)', [name, ids]);
         }
       }
       if (body.meta) await saveMeta(conn, body.meta);
     });
-    console.log(new Date().toISOString(), 'sync done', what, (Date.now() - t0) + ' ms');
-    res.json({ ok: true, photos });
+    console.log(new Date().toISOString(), 'sync done', what, (Date.now() - t0) + ' ms' + (newer.length ? ', kept ' + newer.length + ' newer' : ''));
+    res.json({ ok: true, photos, newer });
   } catch (e) { next(e); }
 });
 

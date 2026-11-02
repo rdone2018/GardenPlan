@@ -81,22 +81,76 @@ window.GP = window.GP || {};
   // which local items were really changed here (and must not be overwritten by an older copy from this device).
   const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return (h >>> 0).toString(36); };
   function setBase() {
-    syncInfo.base = {};
+    syncInfo.base = { meta: snap.meta };
     for (const c of COLLECTIONS) { const b = syncInfo.base[c] = {}; for (const [id, json] of snap[c]) b[id] = hash(json); }
   }
 
-  // Server data + local changes the server never got (only items changed on this device win; nothing is deleted).
-  function mergeLocal(server, local) {
-    const out = Object.assign(emptyState(), server);
-    const base = syncInfo.base;
+  // Did this device change the item since the server last confirmed it?
+  function changedHere(c, id, json) {
+    if (snap) return snap[c].get(id) !== json;
+    const b = syncInfo.base && syncInfo.base[c];
+    return !(b && b[id] === hash(json));
+  }
+
+  // Items edited on this device get the time of the edit (mt), so that when two devices changed the same item,
+  // the later edit wins (see mergeLocal). Returns whether anything differs from the server.
+  // keepTimes: the changes come from an earlier visit and already carry their edit times.
+  const stamped = new Map(); // 'collection|id' -> the item right after its last stamp
+  function markChanges(keepTimes) {
+    const t = Date.now(), base = syncInfo.base || {};
+    let any = metaOf(GP.state) !== (snap ? snap.meta : base.meta);
     for (const c of COLLECTIONS) {
+      const ids = new Set();
+      for (const x of GP.state[c] || []) {
+        if (!x || !x.id) continue;
+        ids.add(x.id);
+        const json = JSON.stringify(x), key = c + '|' + x.id;
+        if (!changedHere(c, x.id, json)) continue;
+        any = true;
+        if (stamped.get(key) === json) continue;
+        if (!keepTimes) x.mt = t;
+        stamped.set(key, JSON.stringify(x));
+      }
+      const known = snap ? [...snap[c].keys()] : Object.keys(base[c] || {});
+      if (known.some(id => !ids.has(id))) any = true;
+    }
+    return any;
+  }
+
+  // Server data + local changes the server never got, item by item: a change made on one side only wins; when both
+  // sides changed an item, the later edit (mt) wins. Items deleted here are deleted on the server too, unless another
+  // device changed them meanwhile. A copy saved by an older version has no fingerprints and no edit times – its items
+  // that differ from the server cannot be decided and are returned in `unsure` (kept aside for the Data page).
+  function mergeLocal(server, local) {
+    const out = Object.assign(emptyState(), server), unsure = {};
+    const base = syncInfo.base;
+    let won = 0;
+    for (const c of COLLECTIONS) {
+      const b = base ? base[c] || {} : null;
       const m = new Map((server[c] || []).map(x => [x.id, x]));
-      for (const x of local[c] || []) if (x && x.id && !(base && base[c] && base[c][x.id] === hash(JSON.stringify(x)))) m.set(x.id, x);
+      const here = new Set();
+      for (const x of local[c] || []) {
+        if (!x || !x.id) continue;
+        here.add(x.id);
+        const s = m.get(x.id), json = JSON.stringify(x);
+        if ((s && JSON.stringify(s) === json) || (b && b[x.id] === hash(json))) continue; // the server copy is current
+        let mine;
+        if (!s) mine = b || x.mt ? true : null;                                    // new here (or deleted elsewhere)
+        else if (b && b[x.id] === hash(JSON.stringify(s))) mine = true;            // changed only here
+        else if (!b && !x.mt) mine = null;
+        else mine = (x.mt || 0) > (s.mt || 0);                                     // changed on both sides
+        if (mine) { m.set(x.id, x); won++; }
+        else if (mine === null) (unsure[c] = unsure[c] || []).push(x);
+      }
+      if (b) for (const id of Object.keys(b)) {
+        const s = m.get(id);
+        if (!here.has(id) && s && hash(JSON.stringify(s)) === b[id]) { m.delete(id); won++; }
+      }
       out[c] = [...m.values()];
     }
     out.settings = local.settings || out.settings;
     out.taskDone = Object.assign({}, server.taskDone, local.taskDone);
-    return out;
+    return { state: out, unsure, won };
   }
 
   // -> { state } | { reachable, error }; reachable = our server answered (even with an error)
@@ -124,7 +178,7 @@ window.GP = window.GP || {};
       // with nothing to send the body would finish before `syncing` is assigned and leave it set for good
       // (every later save was then skipped while the status still said "saved")
       await null;
-      let part = 0;
+      let part = 0, newerSeen = false;
       try {
         for (;;) {
           part++;
@@ -132,7 +186,12 @@ window.GP = window.GP || {};
           const body = { upsert: {}, delete: {} }, sent = [];
           let size = 0, any = false;
           for (const c of COLLECTIONS) {
-            for (const id of snap[c].keys()) if (!next[c].has(id)) { (body.delete[c] = body.delete[c] || []).push(id); sent.push([c, id, null]); any = true; }
+            for (const [id, json] of snap[c]) {
+              if (next[c].has(id)) continue;
+              (body.delete[c] = body.delete[c] || []).push(id);
+              ((body.seen = body.seen || {})[c] = body.seen[c] || {})[id] = JSON.parse(json).mt || 0;
+              sent.push([c, id, null]); any = true;
+            }
           }
           if (next.meta !== snap.meta) { body.meta = JSON.parse(next.meta); any = true; }
           fill: for (const c of COLLECTIONS) {
@@ -170,13 +229,27 @@ window.GP = window.GP || {};
             o.photo = url;
             snap[c].set(id, JSON.stringify(o));
           }
-          if ((answer.photos || []).length) writeLocal();
+          // another device edited some of these items later: its version stays and is shown here too
+          for (const [c, obj] of answer.newer || []) {
+            const sentJson = (sent.find(s => s[0] === c && s[1] === obj.id) || [])[2];
+            const json = JSON.stringify(obj), at = GP.state[c].findIndex(x => x.id === obj.id);
+            snap[c].set(obj.id, json);
+            stamped.delete(c + '|' + obj.id);
+            if (at >= 0 && JSON.stringify(GP.state[c][at]) === sentJson) GP.state[c][at] = obj; // unless edited again meanwhile
+            else if (at < 0 && sentJson === null) GP.state[c].push(obj);                       // deleted here, edited there
+            newerSeen = true;
+          }
+          if ((answer.photos || []).length || (answer.newer || []).length) writeLocal();
         }
         clearTimeout(retryTimer);
         syncInfo.dirty = false;
         setBase();
         writeSyncInfo();
         status('✓ ' + GP.L('Uloženo na server', 'Saved to server') + ' ' + now());
+        if (newerSeen) {
+          if (GP.ui) GP.ui.toast(GP.L('Některé položky mezitím upravilo jiné zařízení – ponechána novější verze.', 'Another device edited some items later – the newer version was kept.'));
+          if (GP.render) GP.render();
+        }
       } catch (e) {
         console.error('Server save failed', e);
         status('⚠ ' + GP.L('Neuloženo na server', 'Not saved to server') + ' (' + e.message + ') – ' + GP.L('zkusím znovu, změny jsou v prohlížeči', 'retrying, changes are kept in the browser'), true);
@@ -209,17 +282,15 @@ window.GP = window.GP || {};
     GP.storageMode = 'server';
     GP.offline = false;
     snap = snapshot(Object.assign(emptyState(), serverState));
-    // a copy saved by an older version has no fingerprints: it cannot tell its own changes from stale items, so it
-    // would overwrite newer data from other devices – the server copy is shown and the local one is kept aside
-    // for the Data page, where the user picks what to bring back (never thrown away)
-    const pending = syncInfo.dirty && local && syncInfo.base;
-    if (syncInfo.dirty && local && !syncInfo.base) keepUnsent(local);
-    if (!pending) syncInfo.dirty = false;
-    GP.state = pending ? mergeLocal(serverState, local) : Object.assign(emptyState(), serverState);
+    const merged = syncInfo.dirty && local ? mergeLocal(serverState, local) : null;
+    // items that cannot be decided are never thrown away: the user picks on the Data page what to bring back
+    if (merged && Object.keys(merged.unsure).length) keepUnsent(Object.assign({}, merged.unsure));
+    GP.state = merged ? merged.state : Object.assign(emptyState(), serverState);
     setBase();
     syncInfo.mode = 'server';
+    syncInfo.dirty = !!merged && markChanges(true);
     writeLocal();
-    if (pending) { status(GP.L('Odesílám neuložené změny…', 'Sending unsaved changes…')); setTimeout(syncServer, 300); }
+    if (syncInfo.dirty) { status(GP.L('Odesílám změny z tohoto zařízení…', 'Sending the changes from this device…')); setTimeout(syncServer, 300); }
     else status('✓ ' + GP.L('Připojeno k databázi', 'Connected to database'));
   }
 
@@ -237,27 +308,33 @@ window.GP = window.GP || {};
   // ---------- public API ----------
   GP.load = async function () {
     // ask the server right away; the browser copy is read meanwhile
-    const server = fetchState();
-    // Browser storage sometimes stalls (seen in Edge): give it a few seconds, then go on without it. It is then not
-    // touched at all this time, so an unsent copy in it is not overwritten either.
-    const LATE = {};
-    const inTime = p => Promise.race([p, new Promise(resolve => setTimeout(() => resolve(LATE), 5000))]);
+    const t0 = performance.now(), ms = () => Math.round(performance.now() - t0);
+    const times = GP.startTimes = { page: Math.round(t0) };
+    status(GP.L('Načítám data…', 'Loading data…'));
+    const server = fetchState().then(r => { times.server = ms(); return r; });
+    // Browser storage sometimes stalls (seen in Edge): give it a few seconds in all, then go on without it. It is
+    // then not touched at all this time, so an unsent copy in it is not overwritten either.
+    const LATE = {}, deadline = new Promise(resolve => setTimeout(() => resolve(LATE), 4000));
+    const inTime = p => Promise.race([p, deadline]);
     let local = null;
     try {
       db = await inTime(openDb());
-      if (db === LATE) throw new Error('IndexedDB did not open within 5 s');
+      if (db === LATE) throw new Error('IndexedDB did not open within 4 s');
       const rows = await inTime(Promise.all([readKey(KEY), readKey(SYNC_KEY), readKey(UNSENT_KEY)]));
-      if (rows === LATE) throw new Error('IndexedDB did not answer within 5 s');
+      if (rows === LATE) throw new Error('IndexedDB did not answer within 4 s');
       const [l, si, un] = rows;
       local = l;
       syncInfo = Object.assign({ mode: 'local', dirty: false }, si);
       GP.hasUnsent = !!un;
     } catch (e) {
       console.error('Storage unavailable', e);
+      times.storageError = e.message;
       db = null;
     }
+    times.storage = ms();
 
     const r = await server;
+    console.log('GardenPlan start (ms):', JSON.stringify(times));
     if (r.state) return useServerState(r.state, local);
 
     if (r.reachable || syncInfo.mode === 'server') {
@@ -273,6 +350,7 @@ window.GP = window.GP || {};
 
     // no server at all (file:// or a plain static server) -> browser storage
     GP.state = Object.assign(emptyState(), local || {});
+    status('');
     if (!db) GP.storageError = true;
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   };
@@ -294,7 +372,9 @@ window.GP = window.GP || {};
 
   function write() {
     saveTimer = null;
-    if (GP.storageMode === 'server') syncInfo.dirty = true;
+    // only real changes count: a "dirty" flag left behind by a page closed mid-save used to make the next visit
+    // treat the whole local copy as unsent
+    if (GP.storageMode === 'server' && markChanges()) syncInfo.dirty = true;
     writeLocal();
     if (GP.storageMode === 'server') syncServer();
   }

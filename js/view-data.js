@@ -34,8 +34,8 @@
     const KIND = { gardens: L('zahrada', 'garden'), plants: L('rostlina', 'plant'), placements: L('výsadba', 'planting'), equipment: L('technika', 'equipment'), tasks: L('úkol', 'task') };
     const name = r => r.c === 'plants' ? GP.plantName(r.x) : r.c === 'placements' ? GP.plantName(GP.byId('plants', r.x.plantId) || r.x) : (r.x.name || r.x.title || r.x.id);
     box.innerHTML = '<h3>⚠ ' + L('Neodeslané změny z tohoto prohlížeče', 'Unsent changes from this browser') + '</h3>' +
-      '<p class="small">' + L('Tyto změny se uložily jen sem (' + new Date(copy.time).toLocaleString('cs-CZ') + ') a na server se nedostaly. Vyberte, které chcete vrátit – přepíší současnou verzi na serveru.',
-        'These changes were only stored here (' + new Date(copy.time).toLocaleString('en-GB') + ') and never reached the server. Pick the ones to bring back – they replace the current version on the server.') + '</p>' +
+      '<p class="small">' + L('Tyto položky uložila v tomto prohlížeči starší verze aplikace (odloženo ' + new Date(copy.time).toLocaleString('cs-CZ') + ') a liší se od serveru. Neuložila k nim čas úpravy, takže nejde poznat, zda jsou novější. Vyberte, které chcete vrátit – přepíší současnou verzi na serveru. Ostatní změny se už rozhodují samy: novější úprava vyhraje.',
+        'An older version of the app stored these items in this browser (set aside ' + new Date(copy.time).toLocaleString('en-GB') + ') and they differ from the server. It kept no edit time, so it cannot be told whether they are newer. Pick the ones to bring back – they replace the current version on the server. Other changes are now decided automatically: the later edit wins.') + '</p>' +
       (list.length ? '<div class="unsent-list">' + list.map((r, i) => '<label class="row gap small"><input type="checkbox" data-i="' + i + '" checked> ' +
         (r.x.photo ? '<img src="' + esc(r.x.photo) + '" alt="">' : '') + '<b>' + esc(name(r)) + '</b> <span class="muted">' + KIND[r.c] + ' · ' + r.what + '</span></label>').join('') + '</div>'
         : '<p class="muted small">' + L('Nic se neliší od serveru.', 'Nothing differs from the server.') + '</p>') +
@@ -59,6 +59,24 @@
     };
   }
 
+  // The copy kept aside is dropped when nothing in it differs from the server any more. -> true when dropped
+  GP.unsent.check = async function () {
+    const copy = await GP.unsent.get();
+    if (copy && (await unsentChanges(copy.state || {})).length) return false;
+    GP.unsent.drop();
+    return true;
+  };
+
+  // How long the last start took on this device (to find out why it is slow)
+  function startLine() {
+    const t = GP.startTimes;
+    if (!t) return '';
+    const s = n => n == null ? '–' : n < 1000 ? n + ' ms' : (n / 1000).toLocaleString(L('cs-CZ', 'en-GB'), { maximumFractionDigits: 1 }) + ' s';
+    return '<p class="muted small">⏱ ' + L('Start na tomto zařízení', 'Start on this device') + ': ' + s(t.total) + ' (' +
+      [L('načtení stránky', 'page load') + ' ' + s(t.page), L('server', 'server') + ' ' + s(t.server), L('úložiště prohlížeče', 'browser storage') + ' ' + s(t.storage) +
+        (t.storageError ? ' ⚠ ' + esc(t.storageError) : ''), L('vykreslení', 'drawing') + ' ' + s(t.render)].join(' · ') + ')</p>';
+  }
+
   GP.views.data = {
     render() {
       const size = Math.round(JSON.stringify(GP.state).length / 1024);
@@ -68,6 +86,7 @@
           ? '🗄️ ' + L('Data se ukládají do databáze <b>MariaDB</b> na serveru – stejná data vidíte z každého zařízení. Záloha do souboru se přesto hodí.', 'Data is stored in the <b>MariaDB</b> database on the server – every device sees the same data. A file backup is still useful.')
           : '💻 ' + L('Data se ukládají jen <b>v tomto prohlížeči</b> (aplikace neběží přes server s databází). Pravidelně si stáhněte zálohu. Do databáze je přenesete tak, že zálohu nahrajete v aplikaci otevřené ze serveru.', 'Data is stored only <b>in this browser</b> (the app is not running through the database server). Download backups regularly. To move them into the database, restore the backup in the app opened from the server.')) + '</p>' +
         '<p class="muted small">' + L('Velikost dat', 'Data size') + ': ' + size + ' kB · ' + GP.state.plants.length + ' ' + L('rostlin', 'plants') + ' · ' + GP.state.gardens.length + ' ' + L('zahrad', 'gardens') + '</p>' +
+        startLine() +
         '<div class="row gap"><button class="btn primary" data-act="backup">⬇ ' + L('Stáhnout zálohu (JSON)', 'Download backup (JSON)') + '</button>' +
         '<label class="btn">⬆ ' + L('Obnovit ze zálohy', 'Restore from backup') + '<input type="file" accept=".json,application/json" data-act="restore" hidden></label>' +
         '<button class="btn" data-act="csv">⬇ ' + L('Rostliny jako CSV (Excel)', 'Plants as CSV (Excel)') + '</button></div></div>' +
