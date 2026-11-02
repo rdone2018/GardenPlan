@@ -79,6 +79,8 @@
 
   // ---------- month page: overview of the work + sections Planting · Flowering · Ripening · Care ----------
   const nextMonth = m => m % 12 + 1;
+  // section icons in one size and width, so the headings line up and are easy to spot
+  const ico = icon => '<span class="ico">' + icon + '</span>';
   // kinds of work, in the order of the overview (only the ones that occur are shown)
   const workKinds = () => careFields().map(f => ({ id: f.key, icon: f.icon || '•', label: GP.fieldLabel(f), is: t => t.kind === 'care' && t.field === f.key }))
     .concat([{ id: 'eq', icon: '⚙️', label: L('Technika', 'Equipment'), is: t => t.kind === 'eq' }, { id: 'task', icon: '📝', label: L('Vlastní úkoly', 'Custom tasks'), is: t => t.kind === 'task' }]);
@@ -100,7 +102,7 @@
         (kinds.length ? '<div class="sum-rows">' + kinds.map(k => {
           const ts = ag.tasks.filter(k.is), d = next ? 0 : ts.filter(isDone).length;
           const names = [...new Set(ts.map(t => t.plant ? GP.plantName(t.plant) : t.title))].sort((x, y) => x.localeCompare(y, 'cs'));
-          return '<div class="sum-row" tabindex="0"><span class="sum-lbl">' + k.icon + ' ' + esc(k.label) + '</span>' +
+          return '<div class="sum-row" tabindex="0"><span class="sum-lbl">' + ico(k.icon) + esc(k.label) + '</span>' +
             '<div class="sum-bar"><i class="' + (next ? 'nxt' : 'cur') + '" style="width:' + w(ts.length) + '">' + (next ? '' : '<b style="width:' + (ts.length ? d / ts.length * 100 : 0) + '%"></b>') + '</i><em>' + ts.length + '</em></div>' +
             (names.length ? '<div class="sum-tip">' + names.map(esc).join('<br>') + '</div>' : '') + '</div>';
         }).join('') + '</div>' : '<p class="muted small">' + L('Žádné úkoly.', 'No tasks.') + '</p>') +
@@ -121,12 +123,12 @@
         (t.text ? '<div class="small muted pre">' + esc(t.text) + '</div>' : '') + '</li>';
     };
     const plantLinks = (list, swatch) => list.length ? '<div class="pchips">' + list.map(p => '<a class="pchip" href="#/plant/' + p.id + '">' + (swatch ? GP.ui.swatch(GP.colorHex(p)) + ' ' : '') + esc(GP.plantName(p)) + '</a>').join('') + '</div>' : '';
-    const sec = (icon, title, n, body, cls) => '<div class="panel cal-sec' + (cls ? ' ' + cls : '') + '"><h3>' + icon + ' ' + title + ' <span class="muted">(' + n + ')</span></h3>' +
+    const sec = (icon, title, n, body, cls) => '<div class="panel cal-sec' + (cls ? ' ' + cls : '') + '"><h3>' + ico(icon) + title + ' <span class="muted">(' + n + ')</span></h3>' +
       (body || '<p class="muted small">' + L('Nic', 'Nothing') + '</p>') + '</div>';
     // one block per kind of work ("✂️ Řez / střih (4)"), each line = the plant
     const block = (k, wide) => {
       const ts = a.tasks.filter(k.is);
-      return '<div class="care-blk' + (wide ? ' wide' : '') + (ts.length ? '' : ' blk-empty') + '"><h4>' + k.icon + ' ' + esc(k.label) + ' <span class="muted">(' + ts.length + ')</span></h4>' +
+      return '<div class="care-blk' + (wide ? ' wide' : '') + (ts.length ? '' : ' blk-empty') + '"><h4>' + ico(k.icon) + esc(k.label) + ' <span class="muted">(' + ts.length + ')</span></h4>' +
         (ts.length ? '<ul class="tasks">' + ts.map(t => li(t, t.plant ? GP.plantName(t.plant) : t.title)).join('') + '</ul>' : '<p class="muted small">' + L('Nic', 'Nothing') + '</p>') + '</div>';
     };
     // left: watering, feeding, pruning · right: winter, diseases, pests · then the rest across the whole width
@@ -228,7 +230,7 @@
       p.support ? L('opora: ', 'support: ') + GP.optLabel(GP.PLANT_OPTS.support, p.support) : ''].filter(Boolean).join(' · ');
     const sec = s => {
       const ps = chosen.filter(p => sowMonths(p, s).includes(m)).sort((a, b) => GP.plantName(a).localeCompare(GP.plantName(b), 'cs'));
-      return '<div class="panel cal-sec"><h3>' + s.icon + ' ' + esc(L(s.f.task[0], s.f.task[1])) + ' <span class="muted">(' + ps.length + ')</span></h3>' +
+      return '<div class="panel cal-sec"><h3>' + ico(s.icon) + esc(L(s.f.task[0], s.f.task[1])) + ' <span class="muted">(' + ps.length + ')</span></h3>' +
         (ps.length ? '<ul class="tasks">' + ps.map(p => {
           const key = 'sow:' + p.id + ':' + s.f.key, d = done[doneKey(key, m)], h = details(p, s);
           const note = String(p.planting || '').split('\n')[0];
@@ -245,7 +247,7 @@
     const allOn = list.length && list.every(p => p.sowPlan), someOn = list.some(p => p.sowPlan);
     const filterRow = '<tr class="filter-row"><th class="pick"></th>' + filterCells(pick, 'data-p') +
       '<th colspan="12">' + sel('only', opt('', L('Všechny rostliny', 'All plants'), pick.only) + opt('dated', L('Jen s termínem výsevu / výsadby', 'Only with a sowing / planting time'), pick.only) + opt('picked', L('Jen vybrané do plánu', 'Only picked for the plan'), pick.only)) + '</th></tr>';
-    const year = '<div class="panel"><h3>✅ ' + L('Výběr rostlin', 'Plant selection') + ' <span class="muted">(' + L('v plánu ', 'in the plan ') + chosen.length + ')</span></h3>' +
+    const year = '<div class="panel"><h3>' + ico('✅') + L('Výběr rostlin', 'Plant selection') + ' <span class="muted">(' + L('v plánu ', 'in the plan ') + chosen.length + ')</span></h3>' +
       '<p class="small muted">' + L('Zaškrtnuté rostliny se objeví nahoře jako úkoly v daných měsících. ', 'Ticked plants show up above as tasks in their months. ') +
         SOW().map(s => s.icon + ' ' + L(s.f.task[0], s.f.task[1])).join(' · ') + '</p>' +
       '<div class="year-wrap"><table class="year pick-year"><thead>' + filterRow + '<tr><th class="pick"><input type="checkbox" data-pickall title="' + L('Vybrat vše zobrazené', 'Pick all shown') + '"' + (allOn ? ' checked' : '') + (someOn && !allOn ? ' data-some' : '') + '></th>' +

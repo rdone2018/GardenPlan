@@ -410,8 +410,15 @@ input.num { width: 4.5rem; }
   border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.12); padding: .4rem .6rem; font-size: .82rem; line-height: 1.35; min-width: 12rem; max-height: 16rem; overflow: auto; }
 .sum-row:hover .sum-tip, .sum-row:focus .sum-tip { display: block; }
 .care-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.2rem; }
-.care-blk { border: 1px solid #eeebe1; border-radius: 8px; padding: .3rem .7rem .4rem; margin-bottom: .6rem; }
-.care-blk h4 { margin: .2rem 0 .3rem; }
+.care-blk { border: 1px solid #e6e2d6; border-radius: 8px; padding: 0 .7rem .4rem; margin-bottom: .8rem; overflow: hidden; }
+.care-blk h4 { display: flex; align-items: center; margin: 0 -.7rem .4rem; padding: .35rem .7rem; background: #f4f2ea; border-bottom: 1px solid #e6e2d6; font-size: 1rem; }
+.care-blk h4 .muted { margin-left: .3rem; font-weight: 400; }
+/* section icons on the calendar pages: one size, one width, so the headings line up */
+.ico { display: inline-flex; justify-content: center; align-items: center; width: 2rem; font-size: 1.5rem; line-height: 1; margin-right: .4rem; flex: none; }
+.cal-sec h3 { display: flex; align-items: center; gap: .3rem; font-size: 1.15rem; }
+.sum-lbl { display: flex; align-items: center; font-size: .9rem; }
+.sum-lbl .ico { width: 1.6rem; font-size: 1.25rem; margin-right: .3rem; }
+.sum-rows { gap: .3rem; }
 .care-blk.blk-empty { opacity: .6; }
 .care-blk.blk-empty p { margin: 0; }
 @media (max-width: 640px) { .cal-2, .care-grid { grid-template-columns: 1fr; } }
