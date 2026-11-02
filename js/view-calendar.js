@@ -140,10 +140,15 @@
       const name = t => t.plant ? GP.plantName(t.plant) : t.title;
       return [...groups.values()].sort((x, y) => x.order - y.order || x.label.localeCompare(y.label, 'cs')).map(g => {
         g.tasks.sort((x, y) => name(x).localeCompare(name(y), 'cs'));
-        const texts = new Set(g.tasks.map(t => (t.text || '').trim())), common = g.tasks.length > 1 && texts.size === 1 ? [...texts][0] : '';
+        // within the group, plants with the same instruction go together under it (the biggest bunch first);
+        // the plants with an instruction of their own follow, each with its text
+        const byText = new Map();
+        for (const t of g.tasks) { const k = (t.text || '').trim(); if (!byText.has(k)) byText.set(k, []); byText.get(k).push(t); }
+        const shared = [...byText].filter(([k, ts]) => k && ts.length > 1).sort((x, y) => y[1].length - x[1].length);
+        const single = g.tasks.filter(t => !shared.some(([k]) => k === (t.text || '').trim()));
         return '<div class="care-grp">' + (g.label ? '<div class="grp-h">' + esc(g.label) + ' <span class="muted">(' + g.tasks.length + ')</span></div>' : '') +
-          (common ? '<div class="small muted pre grp-note">' + esc(common) + '</div>' : '') +
-          '<ul class="tasks">' + g.tasks.map(t => li(t, name(t), !!common)).join('') + '</ul></div>';
+          shared.map(([k, ts]) => '<div class="grp-same"><div class="small muted pre grp-note">' + esc(k) + '</div><ul class="tasks">' + ts.map(t => li(t, name(t), true)).join('') + '</ul></div>').join('') +
+          (single.length ? '<ul class="tasks">' + single.map(t => li(t, name(t))).join('') + '</ul>' : '') + '</div>';
       }).join('');
     };
     const plantLinks = (list, swatch) => list.length ? '<div class="pchips">' + list.map(p => '<a class="pchip" href="#/plant/' + p.id + '">' + (swatch ? GP.ui.swatch(GP.colorHex(p)) + ' ' : '') + esc(GP.plantName(p)) + '</a>').join('') + '</div>' : '';
