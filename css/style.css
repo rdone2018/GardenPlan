@@ -413,6 +413,12 @@ input.num { width: 4.5rem; }
 .care-blk { border: 1px solid #e6e2d6; border-radius: 8px; padding: 0 .7rem .4rem; margin-bottom: .8rem; overflow: hidden; }
 .care-blk h4 { display: flex; align-items: center; margin: 0 -.7rem .4rem; padding: .35rem .7rem; background: #f4f2ea; border-bottom: 1px solid #e6e2d6; font-size: 1rem; }
 .care-blk h4 .muted { margin-left: .3rem; font-weight: 400; }
+/* plants of one type and crop together, a shared instruction written once */
+.care-grp + .care-grp { margin-top: .5rem; padding-top: .4rem; border-top: 1px dashed #e6e2d6; }
+.grp-h { font-size: .78rem; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: .03em; margin-bottom: .1rem; }
+.grp-h .muted { font-weight: 400; text-transform: none; }
+.grp-note { margin: 0 0 .2rem; padding: .2rem .5rem; background: #f7f6f1; border-left: 3px solid #d9e6cf; border-radius: 0 4px 4px 0; }
+.care-grp .tasks { margin-top: .1rem; }
 /* section icons on the calendar pages: one size, one width, so the headings line up */
 .ico { display: inline-flex; justify-content: center; align-items: center; width: 2rem; font-size: 1.5rem; line-height: 1; margin-right: .4rem; flex: none; }
 .cal-sec h3 { display: flex; align-items: center; gap: .3rem; font-size: 1.15rem; }

@@ -114,13 +114,37 @@
   function monthPage(m, gardenId) {
     const a = GP.monthAgenda(m, gardenId), b = GP.monthAgenda(nextMonth(m), gardenId);
     const done = GP.state.taskDone, showGarden = GP.state.gardens.length > 1 && !gardenId;
-    const li = (t, label) => {
+    const li = (t, label, noText) => {
       const d = done[doneKey(t.key, m)];
       return '<li class="' + (d ? 'done' : '') + '"><label><input type="checkbox" data-done="' + esc(t.key) + '" data-m="' + m + '"' + (d ? ' checked' : '') + '> ' +
         (t.href ? '<a href="' + t.href + '">' + esc(label) + '</a>' : '<b>' + esc(label) + '</b>') + '</label>' +
         (showGarden && t.garden ? ' <span class="tag">' + esc(t.garden.name) + '</span>' : '') +
         (t.custom ? ' <button class="link danger small" data-deltask="' + t.custom.id + '">✕</button>' : '') +
-        (t.text ? '<div class="small muted pre">' + esc(t.text) + '</div>' : '') + '</li>';
+        (t.text && !noText ? '<div class="small muted pre">' + esc(t.text) + '</div>' : '') + '</li>';
+    };
+    // Plants of the same type and crop (or purpose) mostly need the same care: they are listed together, and an
+    // instruction shared by the whole group is written once under its heading.
+    const groupLabel = p => {
+      const s = [p.type ? GP.typeLabel(p.type) : L('bez typu', 'no type'),
+        p.crop ? GP.optLabel(GP.PLANT_OPTS.crop, p.crop) : p.purpose ? GP.optLabel(GP.PLANT_OPTS.purpose, p.purpose) : ''].filter(Boolean).join(' · ');
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+    const typeOrder = p => { const i = GP.PLANT_TYPES.findIndex(t => t[0] === p.type); return i < 0 ? 99 : i; };
+    const taskList = ts => {
+      const groups = new Map();
+      for (const t of ts) {
+        const k = t.plant ? groupLabel(t.plant) : '';
+        if (!groups.has(k)) groups.set(k, { label: k, order: t.plant ? typeOrder(t.plant) : 100, tasks: [] });
+        groups.get(k).tasks.push(t);
+      }
+      const name = t => t.plant ? GP.plantName(t.plant) : t.title;
+      return [...groups.values()].sort((x, y) => x.order - y.order || x.label.localeCompare(y.label, 'cs')).map(g => {
+        g.tasks.sort((x, y) => name(x).localeCompare(name(y), 'cs'));
+        const texts = new Set(g.tasks.map(t => (t.text || '').trim())), common = g.tasks.length > 1 && texts.size === 1 ? [...texts][0] : '';
+        return '<div class="care-grp">' + (g.label ? '<div class="grp-h">' + esc(g.label) + ' <span class="muted">(' + g.tasks.length + ')</span></div>' : '') +
+          (common ? '<div class="small muted pre grp-note">' + esc(common) + '</div>' : '') +
+          '<ul class="tasks">' + g.tasks.map(t => li(t, name(t), !!common)).join('') + '</ul></div>';
+      }).join('');
     };
     const plantLinks = (list, swatch) => list.length ? '<div class="pchips">' + list.map(p => '<a class="pchip" href="#/plant/' + p.id + '">' + (swatch ? GP.ui.swatch(GP.colorHex(p)) + ' ' : '') + esc(GP.plantName(p)) + '</a>').join('') + '</div>' : '';
     const sec = (icon, title, n, body, cls) => '<div class="panel cal-sec' + (cls ? ' ' + cls : '') + '"><h3>' + ico(icon) + title + ' <span class="muted">(' + n + ')</span></h3>' +
@@ -129,7 +153,7 @@
     const block = (k, wide) => {
       const ts = a.tasks.filter(k.is);
       return '<div class="care-blk' + (wide ? ' wide' : '') + (ts.length ? '' : ' blk-empty') + '"><h4>' + ico(k.icon) + esc(k.label) + ' <span class="muted">(' + ts.length + ')</span></h4>' +
-        (ts.length ? '<ul class="tasks">' + ts.map(t => li(t, t.plant ? GP.plantName(t.plant) : t.title)).join('') + '</ul>' : '<p class="muted small">' + L('Nic', 'Nothing') + '</p>') + '</div>';
+        (ts.length ? taskList(ts) : '<p class="muted small">' + L('Nic', 'Nothing') + '</p>') + '</div>';
     };
     // left: watering, feeding, pruning · right: winter, diseases, pests · then the rest across the whole width
     const kinds = workKinds(), byId = id => kinds.find(k => k.id === id);
