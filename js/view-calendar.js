@@ -46,8 +46,9 @@
 
   // The run of consecutive months around m in which a task falls, with their years ([11, 12, 1] in January =
   // November and December of last year): a one-time task done in any of them is done for the whole run.
-  function season(months, m) {
-    const set = new Set(months || []), y = new Date().getFullYear(), out = [[m, y]];
+  function season(months, m, y) {
+    y = y || new Date().getFullYear();
+    const set = new Set(months || []), out = [[m, y]];
     if (!set.has(m)) return out;
     for (let mm = m, yy = y; out.length < 12;) {
       const prev = mm === 1 ? 12 : mm - 1;
@@ -64,9 +65,10 @@
     return out;
   }
   // done keys that count for task t in month m (one-time care: the whole run of months)
-  const doneKeys = (t, m) => t.once ? season(t.months, m).map(([mm, yy]) => doneKey(t.key, mm, yy)) : [doneKey(t.key, m)];
-  // -> '' (not done) | the month it was done in
-  const doneIn = (t, m) => { const k = doneKeys(t, m).find(k => GP.state.taskDone[k]); return k ? +k.split('|').pop() : ''; };
+  const doneKeys = (t, m, y) => t.once ? season(t.months, m, y).map(([mm, yy]) => doneKey(t.key, mm, yy)) : [doneKey(t.key, m, y)];
+  // -> '' (not done) | the month it was done in; a task marked "will not be done" ('skip') counts as dealt with
+  const doneIn = (t, m, y) => { const k = doneKeys(t, m, y).find(k => GP.state.taskDone[k]); return k ? +k.split('|').pop() : ''; };
+  const skipped = (t, m, y) => doneKeys(t, m, y).some(k => GP.state.taskDone[k] === 'skip');
   // checkbox of a task; a one-time task done in another month says when
   const doneBox = (t, m) => {
     const d = doneIn(t, m);
@@ -76,15 +78,15 @@
     if (!t.once) return '';
     const d = doneIn(t, m);
     return ' <span class="once-tag" title="' + esc(L('Jednorázová péče – stačí jednou v kterémkoli z jejích měsíců', 'One-time care – once in any of its months')) + '">1×' +
-      (d && d !== m ? ' · ' + L('hotovo: ', 'done: ') + esc(GP.monthName(d)) : '') + '</span>';
+      (skipped(t, m) ? ' · ' + L('nebude se dělat', 'will not be done') : d && d !== m ? ' · ' + L('hotovo: ', 'done: ') + esc(GP.monthName(d)) : '') + '</span>';
   };
+  const doneCls = (t, m) => (skipped(t, m) ? 'done skipped' : doneIn(t, m) ? 'done' : '');
 
   GP.agendaHtml = function (m, gardenId, compact) {
     const a = GP.monthAgenda(m, gardenId);
     const showGarden = GP.state.gardens.length > 1 && !gardenId;
     let html = '<ul class="tasks">' + (a.tasks.map(t => {
-      const d = doneIn(t, m);
-      return '<li class="' + (d ? 'done' : '') + '"><label>' + doneBox(t, m) + ' <span>' + t.icon + '</span> ' +
+      return '<li class="' + doneCls(t, m) + '"><label>' + doneBox(t, m) + ' <span>' + t.icon + '</span> ' +
         (t.href ? '<a href="' + t.href + '">' + esc(t.title) + '</a>' : '<b>' + esc(t.title) + '</b>') + '</label>' + onceNote(t, m) +
         (showGarden && t.garden ? ' <span class="tag">' + esc(t.garden.name) + '</span>' : '') +
         (t.custom && !compact ? ' <button class="link danger small" data-deltask="' + t.custom.id + '">✕</button>' : '') +
@@ -124,38 +126,72 @@
 
   const tasksWord = n => L(n === 1 ? 'úkol' : n >= 2 && n <= 4 ? 'úkoly' : 'úkolů', n === 1 ? 'task' : 'tasks');
 
-  // Two boxes: this month (left) and next month (right, grey); one bar per kind of work, on the same scale.
-  // Pointing at a row (or tapping it) lists the plants it is about.
-  function overview(m, a, b) {
-    const isDone = t => doneIn(t, m);
+  const prevMonth = m => (m + 10) % 12 + 1;
+  // the month before m with its year (December of last year before January)
+  const before = m => [prevMonth(m), new Date().getFullYear() - (m === 1 ? 1 : 0)];
+
+  // One-time care whose months ended with the month before m and that was neither done nor marked "will not be
+  // done". Only for months already over: a month still to come cannot be missed yet.
+  function missed(m, gardenId) {
+    const [pm, py] = before(m), now = new Date().getMonth() + 1;
+    if (m !== 1 && m > now) return [];
+    return GP.monthAgenda(pm, gardenId).tasks.filter(t => t.once && !(t.months || []).includes(m) && !doneIn(t, pm, py));
+  }
+
+  // Three boxes: previous month (grey), this month (highlighted) and next month (grey); one bar per kind of work,
+  // on the same scale. Pointing at a row (or tapping it) lists the plants it is about.
+  function overview(m, a, b, p, nMissed) {
+    const [pm, py] = before(m);
     // one-time care already done this month is no work for next month
     b = Object.assign({}, b, { tasks: b.tasks.filter(t => !(t.once && doneIn(t, nextMonth(m)))) });
-    const kinds = workKinds().filter(k => a.tasks.some(k.is) || b.tasks.some(k.is));
-    const max = Math.max(1, ...kinds.map(k => Math.max(a.tasks.filter(k.is).length, b.tasks.filter(k.is).length)));
+    const kinds = workKinds().filter(k => [a, b, p].some(ag => ag.tasks.some(k.is)));
+    const max = Math.max(1, ...kinds.map(k => Math.max(...[a, b, p].map(ag => ag.tasks.filter(k.is).length))));
     // bar length as a share of the track minus room for the number
     const w = n => 'calc((100% - 2rem) * ' + (n / max).toFixed(3) + ')';
-    const box = (mm, ag, next) => {
-      const nDone = next ? 0 : ag.tasks.filter(isDone).length;
-      return '<div class="panel cal-sum' + (next ? ' nx' : '') + '"><div class="sum-top"><div><span class="sum-n">' + ag.tasks.length + '</span> ' + tasksWord(ag.tasks.length) + ' · <b>' + esc(GP.monthName(mm)) + '</b>' +
-          (next ? ' <span class="muted small">' + L('(příští měsíc)', '(next month)') + '</span>' : ag.tasks.length ? ' <span class="muted small">(' + L('hotovo', 'done') + ' ' + nDone + ')</span>' : '') + '</div></div>' +
+    // which: 'pv' previous, '' this month, 'nx' next
+    const box = (mm, yy, ag, which) => {
+      const isDone = t => doneIn(t, mm, yy), next = which === 'nx', nDone = next ? 0 : ag.tasks.filter(isDone).length;
+      return '<div class="panel cal-sum' + (which ? ' ' + which : ' cur') + '"><div class="sum-cap">' +
+          (which === 'pv' ? L('◀ předchozí měsíc', '◀ previous month') : next ? L('následující měsíc ▶', 'next month ▶') : L('vybraný měsíc', 'selected month')) + '</div>' +
+        '<div class="sum-top"><div><span class="sum-n">' + ag.tasks.length + '</span> ' + tasksWord(ag.tasks.length) + ' · <b>' + esc(GP.monthName(mm)) + '</b>' +
+          (!next && ag.tasks.length ? ' <span class="muted small">(' + L('hotovo', 'done') + ' ' + nDone + ')</span>' : '') +
+          (which === 'pv' && nMissed ? ' <button class="link missed-n" data-gomissed>⚠ ' + L('nestihnuto ', 'missed ') + nMissed + '</button>' : '') + '</div></div>' +
         (kinds.length ? '<div class="sum-rows">' + kinds.map(k => {
           const ts = ag.tasks.filter(k.is), d = next ? 0 : ts.filter(isDone).length;
           const names = [...new Set(ts.map(t => t.plant ? GP.plantName(t.plant) : t.title))].sort((x, y) => x.localeCompare(y, 'cs'));
           return '<div class="sum-row" tabindex="0"><span class="sum-lbl">' + ico(k.icon) + esc(k.label) + '</span>' +
-            '<div class="sum-bar"><i class="' + (next ? 'nxt' : 'cur') + '" style="width:' + w(ts.length) + '">' + (next ? '' : '<b style="width:' + (ts.length ? d / ts.length * 100 : 0) + '%"></b>') + '</i><em>' + ts.length + '</em></div>' +
+            '<div class="sum-bar"><i class="' + (which ? 'nxt' : 'cur') + '" style="width:' + w(ts.length) + '">' + (next ? '' : '<b style="width:' + (ts.length ? d / ts.length * 100 : 0) + '%"></b>') + '</i><em>' + ts.length + '</em></div>' +
             (names.length ? '<div class="sum-tip">' + names.map(esc).join('<br>') + '</div>' : '') + '</div>';
         }).join('') + '</div>' : '<p class="muted small">' + L('Žádné úkoly.', 'No tasks.') + '</p>') +
         '<p class="small muted sum-foot">🌸 ' + L('kvete', 'in flower') + ' ' + ag.bloom.length + ' · 🍎 ' + L('zraje', 'ripening') + ' ' + ag.harvest.length + '</p></div>';
     };
-    return '<div class="cal-2">' + box(m, a) + box(nextMonth(m), b, true) + '</div>';
+    return '<div class="cal-3">' + box(pm, py, p, 'pv') + box(m, 0, a, '') + box(nextMonth(m), 0, b, 'nx') + '</div>';
+  }
+
+  // Missed one-time care: tick it as done after all, or mark that it will not be done this season.
+  function missedPanel(m, list) {
+    if (!list.length) return '';
+    const [pm, py] = before(m);
+    const showGarden = GP.state.gardens.length > 1;
+    return '<div class="panel missed" id="missed"><h3>' + ico('⚠️') + L('Nestihnuto – ', 'Missed – ') + esc(GP.monthName(pm)) + ' <span class="muted">(' + list.length + ')</span></h3>' +
+      '<p class="small muted">' + L('Jednorázová péče, jejíž období skončilo a není odškrtnutá. Zde ji označte jako udělanou, nebo že se letos dělat nebude.',
+        'One-time care whose months are over and that is not ticked. Mark it done, or that it will not be done this season.') + '</p><ul class="tasks">' +
+      list.map(t => {
+        const key = doneKey(t.key, pm, py);
+        return '<li><span>' + t.icon + '</span> ' + (t.href ? '<a href="' + t.href + '">' + esc(t.title) + '</a>' : '<b>' + esc(t.title) + '</b>') +
+          ' <span class="muted small">' + esc(GP.formatMonths(t.months || [])) + '</span>' +
+          (showGarden && t.garden ? ' <span class="tag">' + esc(t.garden.name) + '</span>' : '') +
+          '<span class="missed-act"><button class="btn small" data-missed="' + esc(key) + '" data-v="1">✓ ' + L('udělané', 'done') + '</button>' +
+          '<button class="btn small" data-missed="' + esc(key) + '" data-v="skip">✕ ' + L('nebude se dělat', 'will not be done') + '</button></span>' +
+          (t.text ? '<div class="small muted pre">' + esc(t.text) + '</div>' : '') + '</li>';
+      }).join('') + '</ul></div>';
   }
 
   function monthPage(m, gardenId) {
     const a = GP.monthAgenda(m, gardenId), b = GP.monthAgenda(nextMonth(m), gardenId);
     const showGarden = GP.state.gardens.length > 1 && !gardenId;
     const li = (t, label, noText) => {
-      const d = doneIn(t, m);
-      return '<li class="' + (d ? 'done' : '') + '"><label>' + doneBox(t, m) + ' ' +
+      return '<li class="' + doneCls(t, m) + '"><label>' + doneBox(t, m) + ' ' +
         (t.href ? '<a href="' + t.href + '">' + esc(label) + '</a>' : '<b>' + esc(label) + '</b>') + '</label>' + onceNote(t, m) +
         (showGarden && t.garden ? ' <span class="tag">' + esc(t.garden.name) + '</span>' : '') +
         (t.custom ? ' <button class="link danger small" data-deltask="' + t.custom.id + '">✕</button>' : '') +
@@ -205,7 +241,11 @@
     const kinds = workKinds(), byId = id => kinds.find(k => k.id === id);
     const left = ['watering', 'fertilizing', 'pruning'].map(byId).filter(Boolean), right = ['winter', 'diseases', 'pests'].map(byId).filter(Boolean);
     const rest = kinds.filter(k => !left.includes(k) && !right.includes(k) && (k.id === 'otherCare' || a.tasks.some(k.is)));
-    return overview(m, a, b) + '<div id="agenda"><div class="cal-2">' +
+    const p = GP.monthAgenda(prevMonth(m), gardenId), miss = missed(m, gardenId);
+    return overview(m, a, b, p, miss.length) + missedPanel(m, miss) +
+      // everything below is about the selected month only
+      '<h2 class="month-h">' + ico('📋') + esc(GP.monthName(m).replace(/^./, c => c.toUpperCase())) + ' <span class="muted small">' + L('– úkoly a dění tohoto měsíce', '– tasks and events of this month') + '</span></h2>' +
+      '<div id="agenda"><div class="cal-2">' +
       sec('🌸', L('Kvetení', 'Flowering'), a.bloom.length, plantLinks(a.bloom, true)) +
       sec('🍎', L('Zrání a sklizeň', 'Ripening and harvest'), a.harvest.length, plantLinks(a.harvest)) + '</div>' +
       sec('🧰', L('Péče', 'Care'), a.tasks.length,
@@ -395,6 +435,13 @@
         if (!p) return;
         if (c.checked) p.sowPlan = true; else delete p.sowPlan;
         GP.save(); GP.render();
+      });
+      const gm = root.querySelector('[data-gomissed]');
+      if (gm) gm.onclick = () => root.querySelector('#missed').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      root.querySelectorAll('[data-missed]').forEach(b => b.onclick = () => {
+        GP.state.taskDone[b.dataset.missed] = b.dataset.v === 'skip' ? 'skip' : true;
+        GP.save(); GP.render();
+        GP.ui.toast(b.dataset.v === 'skip' ? L('Označeno: nebude se dělat', 'Marked: will not be done') : L('Označeno jako udělané', 'Marked as done'));
       });
       const agenda = root.querySelector('#agenda');
       if (!agenda) return;

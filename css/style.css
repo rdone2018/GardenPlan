@@ -437,3 +437,23 @@ input.num { width: 4.5rem; }
 .care-blk.blk-empty { opacity: .6; }
 .care-blk.blk-empty p { margin: 0; }
 @media (max-width: 640px) { .cal-2, .care-grid { grid-template-columns: 1fr; } }
+/* previous · selected · next month: the selected one stands out, the other two are grey and smaller */
+.cal-3 { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 0 .8rem; align-items: start; }
+.cal-3 .sum-row { grid-template-columns: minmax(7rem, 11rem) 1fr; gap: .5rem; }
+.cal-sum.pv { background: #f6f6f4; color: var(--muted); }
+.cal-sum.pv .sum-n, .cal-sum.nx .sum-n { color: var(--muted); font-size: 1.5rem; }
+.cal-sum.pv .sum-row:hover, .cal-sum.pv .sum-row:focus { background: #e9eaec; }
+.cal-sum.cur { border: 2px solid var(--green); box-shadow: 0 2px 10px rgba(62,123,58,.12); }
+.sum-cap { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: -.2rem 0 .35rem; }
+.cal-sum.cur .sum-cap { color: var(--green); font-weight: 700; }
+.missed-n { color: #a5531f; font-weight: 700; margin-left: .3rem; }
+@media (max-width: 1100px) { .cal-3 .pv .sum-row, .cal-3 .nx .sum-row { grid-template-columns: 1fr; gap: .1rem; } }
+@media (max-width: 760px) { .cal-3 { grid-template-columns: 1fr; } .cal-3 .cur { order: -1; } }
+/* missed one-time care of last month */
+.panel.missed { border-left: 4px solid var(--warn); background: #fffaf0; }
+.panel.missed h3 { display: flex; align-items: center; margin-top: 0; }
+.missed-act { display: inline-flex; gap: .3rem; margin-left: .5rem; vertical-align: middle; }
+/* everything below the heading is about the selected month */
+.month-h { display: flex; align-items: center; flex-wrap: wrap; gap: .2rem .4rem; margin: 1.6rem 0 .8rem; padding: .5rem .2rem; border-top: 2px solid var(--green); border-bottom: 1px solid var(--line); color: var(--green); font-size: 1.35rem; }
+.month-h .muted { font-weight: 400; }
+.tasks li.skipped > label { text-decoration-style: dashed; }
