@@ -420,6 +420,9 @@ input.num { width: 4.5rem; }
 .grp-note { margin: 0 0 .2rem; padding: .2rem .5rem; background: #f7f6f1; border-left: 3px solid #d9e6cf; border-radius: 0 4px 4px 0; }
 .care-grp .tasks { margin-top: .1rem; }
 .grp-same + .grp-same, .grp-same + .tasks { margin-top: .4rem; }
+/* one-time care: done once in any of its months */
+.once-tag { display: inline-block; font-size: .72rem; color: #7a6a2f; background: #f6efd6; border-radius: 99px; padding: 0 .45rem; margin-left: .2rem; cursor: help; }
+.care-months label.once { display: inline-flex; align-items: center; gap: .25rem; margin-left: .6rem; color: var(--muted); white-space: nowrap; }
 /* section icons on the calendar pages: one size, one width, so the headings line up */
 .ico { display: inline-flex; justify-content: center; align-items: center; width: 2rem; font-size: 1.5rem; line-height: 1; margin-right: .4rem; flex: none; }
 .cal-sec h3 { display: flex; align-items: center; gap: .3rem; font-size: 1.15rem; }

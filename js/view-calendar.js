@@ -24,7 +24,8 @@
           const key = 'care:' + g.id + ':' + p.id + ':' + f.key + (i ? ':' + i : '');
           if (seen.has(key)) return;
           seen.add(key);
-          tasks.push({ key, kind: 'care', field: f.key, plant: p, icon: f.icon || '•', title: GP.fieldLabel(f) + ' – ' + GP.plantName(p), text: c.text, garden: g, href: '#/plant/' + p.id });
+          tasks.push({ key, kind: 'care', field: f.key, plant: p, icon: f.icon || '•', title: GP.fieldLabel(f) + ' – ' + GP.plantName(p), text: c.text, garden: g, href: '#/plant/' + p.id,
+            once: !!c.once, months: c.months });
         });
       }
     }
@@ -41,16 +42,50 @@
     return { tasks, bloom: [...bloom.values()], harvest: [...harvest.values()] };
   };
 
-  const doneKey = (key, m) => key + '|' + new Date().getFullYear() + '|' + m;
+  const doneKey = (key, m, y) => key + '|' + (y || new Date().getFullYear()) + '|' + m;
+
+  // The run of consecutive months around m in which a task falls, with their years ([11, 12, 1] in January =
+  // November and December of last year): a one-time task done in any of them is done for the whole run.
+  function season(months, m) {
+    const set = new Set(months || []), y = new Date().getFullYear(), out = [[m, y]];
+    if (!set.has(m)) return out;
+    for (let mm = m, yy = y; out.length < 12;) {
+      const prev = mm === 1 ? 12 : mm - 1;
+      if (!set.has(prev)) break;
+      if (mm === 1) yy--;
+      mm = prev; out.unshift([mm, yy]);
+    }
+    for (let mm = m, yy = y; out.length < 12;) {
+      const next = mm % 12 + 1;
+      if (!set.has(next)) break;
+      if (next === 1) yy++;
+      mm = next; out.push([mm, yy]);
+    }
+    return out;
+  }
+  // done keys that count for task t in month m (one-time care: the whole run of months)
+  const doneKeys = (t, m) => t.once ? season(t.months, m).map(([mm, yy]) => doneKey(t.key, mm, yy)) : [doneKey(t.key, m)];
+  // -> '' (not done) | the month it was done in
+  const doneIn = (t, m) => { const k = doneKeys(t, m).find(k => GP.state.taskDone[k]); return k ? +k.split('|').pop() : ''; };
+  // checkbox of a task; a one-time task done in another month says when
+  const doneBox = (t, m) => {
+    const d = doneIn(t, m);
+    return '<input type="checkbox" data-done="' + esc(t.key) + '" data-m="' + m + '"' + (t.once ? ' data-keys="' + esc(doneKeys(t, m).join(' ')) + '"' : '') + (d ? ' checked' : '') + '>';
+  };
+  const onceNote = (t, m) => {
+    if (!t.once) return '';
+    const d = doneIn(t, m);
+    return ' <span class="once-tag" title="' + esc(L('Jednorázová péče – stačí jednou v kterémkoli z jejích měsíců', 'One-time care – once in any of its months')) + '">1×' +
+      (d && d !== m ? ' · ' + L('hotovo: ', 'done: ') + esc(GP.monthName(d)) : '') + '</span>';
+  };
 
   GP.agendaHtml = function (m, gardenId, compact) {
     const a = GP.monthAgenda(m, gardenId);
-    const done = GP.state.taskDone;
     const showGarden = GP.state.gardens.length > 1 && !gardenId;
     let html = '<ul class="tasks">' + (a.tasks.map(t => {
-      const d = done[doneKey(t.key, m)];
-      return '<li class="' + (d ? 'done' : '') + '"><label><input type="checkbox" data-done="' + esc(t.key) + '" data-m="' + m + '"' + (d ? ' checked' : '') + '> <span>' + t.icon + '</span> ' +
-        (t.href ? '<a href="' + t.href + '">' + esc(t.title) + '</a>' : '<b>' + esc(t.title) + '</b>') + '</label>' +
+      const d = doneIn(t, m);
+      return '<li class="' + (d ? 'done' : '') + '"><label>' + doneBox(t, m) + ' <span>' + t.icon + '</span> ' +
+        (t.href ? '<a href="' + t.href + '">' + esc(t.title) + '</a>' : '<b>' + esc(t.title) + '</b>') + '</label>' + onceNote(t, m) +
         (showGarden && t.garden ? ' <span class="tag">' + esc(t.garden.name) + '</span>' : '') +
         (t.custom && !compact ? ' <button class="link danger small" data-deltask="' + t.custom.id + '">✕</button>' : '') +
         (t.text && !compact ? '<div class="small muted pre">' + esc(t.text) + '</div>' : '') + '</li>';
@@ -65,7 +100,9 @@
       const k = e.target.dataset.done;
       if (!k) return;
       const key = doneKey(k, +e.target.dataset.m);
-      if (e.target.checked) GP.state.taskDone[key] = true; else delete GP.state.taskDone[key];
+      if (e.target.checked) GP.state.taskDone[key] = true;
+      // a one-time task may have been ticked in another month of its run: unticking clears it there too
+      else for (const x of (e.target.dataset.keys || key).split(' ')) delete GP.state.taskDone[x];
       e.target.closest('li').classList.toggle('done', e.target.checked);
       GP.save();
     });
@@ -90,7 +127,9 @@
   // Two boxes: this month (left) and next month (right, grey); one bar per kind of work, on the same scale.
   // Pointing at a row (or tapping it) lists the plants it is about.
   function overview(m, a, b) {
-    const done = GP.state.taskDone, isDone = t => done[doneKey(t.key, m)];
+    const isDone = t => doneIn(t, m);
+    // one-time care already done this month is no work for next month
+    b = Object.assign({}, b, { tasks: b.tasks.filter(t => !(t.once && doneIn(t, nextMonth(m)))) });
     const kinds = workKinds().filter(k => a.tasks.some(k.is) || b.tasks.some(k.is));
     const max = Math.max(1, ...kinds.map(k => Math.max(a.tasks.filter(k.is).length, b.tasks.filter(k.is).length)));
     // bar length as a share of the track minus room for the number
@@ -113,11 +152,11 @@
 
   function monthPage(m, gardenId) {
     const a = GP.monthAgenda(m, gardenId), b = GP.monthAgenda(nextMonth(m), gardenId);
-    const done = GP.state.taskDone, showGarden = GP.state.gardens.length > 1 && !gardenId;
+    const showGarden = GP.state.gardens.length > 1 && !gardenId;
     const li = (t, label, noText) => {
-      const d = done[doneKey(t.key, m)];
-      return '<li class="' + (d ? 'done' : '') + '"><label><input type="checkbox" data-done="' + esc(t.key) + '" data-m="' + m + '"' + (d ? ' checked' : '') + '> ' +
-        (t.href ? '<a href="' + t.href + '">' + esc(label) + '</a>' : '<b>' + esc(label) + '</b>') + '</label>' +
+      const d = doneIn(t, m);
+      return '<li class="' + (d ? 'done' : '') + '"><label>' + doneBox(t, m) + ' ' +
+        (t.href ? '<a href="' + t.href + '">' + esc(label) + '</a>' : '<b>' + esc(label) + '</b>') + '</label>' + onceNote(t, m) +
         (showGarden && t.garden ? ' <span class="tag">' + esc(t.garden.name) + '</span>' : '') +
         (t.custom ? ' <button class="link danger small" data-deltask="' + t.custom.id + '">✕</button>' : '') +
         (t.text && !noText ? '<div class="small muted pre">' + esc(t.text) + '</div>' : '') + '</li>';

@@ -11,7 +11,8 @@
       html += '<optgroup label="' + esc(groups[gi][0]) + '">';
       for (const f of GP.PLANT_FIELDS.filter(x => x.group === gi && x.type !== 'color')) {
         html += opt('plant:' + f.key, GP.fieldLabel(f));
-        if (f.type === 'care') html += opt('plant:' + f.key + '.months', GP.fieldLabel(f) + ' – ' + L('měsíce', 'months'));
+        if (f.type === 'care') html += opt('plant:' + f.key + '.months', GP.fieldLabel(f) + ' – ' + L('měsíce', 'months')) +
+          opt('plant:' + f.key + '.once', GP.fieldLabel(f) + ' – ' + L('jednorázově', 'once'));
       }
       html += '</optgroup>';
     }
@@ -91,7 +92,7 @@
     const fieldOf = key => GP.PLANT_FIELDS.find(f => f.key === key);
     const thisRun = new Set(), runPlaced = new Map();
     for (const row of imp.rows) {
-      const data = {}, place = {}, extra = [];
+      const data = {}, place = {}, extra = [], once = {};
       let matchName = '';
       imp.headers.forEach((h, i) => {
         const raw = (row[i] || '').trim();
@@ -106,6 +107,7 @@
         if (f.type === 'care') {
           // a care column fills the first term: its text, or its months ("– měsíce" column)
           // ("Řez 1" + "Řez 2" -> two terms of Řez)
+          if (sub === 'once') { (once[key] = /^(ano|áno|yes|y|1|x|✓|true|jednorázově|jednorazove)$/i.test(raw)); return; }
           const terms = data[key] = data[key] || [];
           if (sub === 'months') {
             const t = terms.find(x => !x.months) || (terms.push({}), terms[terms.length - 1]);
@@ -165,6 +167,8 @@
         res.created++;
       }
       thisRun.add(p.id);
+      // "– jednorázově" marks every term of that care item, also of a plant that is only being filled in
+      for (const [key, v] of Object.entries(once)) for (const t of GP.careTerms(p, key)) { if (v) t.once = true; else delete t.once; }
 
       if (imp.gardenId) {
         const key = p.id + '|' + (place.position || '');

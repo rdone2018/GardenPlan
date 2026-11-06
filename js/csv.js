@@ -47,6 +47,13 @@
       const f = GP.PLANT_FIELDS.find(x => 'plant:' + x.key === base);
       return f && f.type === 'care' ? base + '.months' : '';
     }
+    // "Ochrana na zimu – jednorázově" (ano / ne): done once in any of its months, not every month
+    const onceSuffix = /\s*[–-]\s*(jednorazove|jednorazovo|once)$/;
+    if (onceSuffix.test(h)) {
+      const base = GP.csv.matchHeader(h.replace(onceSuffix, ''));
+      const f = GP.PLANT_FIELDS.find(x => 'plant:' + x.key === base);
+      return f && f.type === 'care' ? base + '.once' : '';
+    }
     // "Původní název" = the plant's current Czech name, used to find it when the file renames it
     const candidates = [['match:name', ['puvodni nazev', 'povodny nazov', 'original name']]];
     for (const f of GP.PLANT_FIELDS) candidates.push(['plant:' + f.key, [GP.norm(f.cs), GP.norm(f.en), ...f.aliases]]);
@@ -67,7 +74,7 @@
     const head = [];
     for (const f of fields) {
       head.push(f.cs);
-      if (f.type === 'care') head.push(f.cs + ' – měsíce');
+      if (f.type === 'care') head.push(f.cs + ' – měsíce', f.cs + ' – jednorázově');
     }
     const lines = [head.map(cell).join(';')];
     for (const p of GP.state.plants) {
@@ -78,6 +85,7 @@
           const terms = GP.careTerms(p, f.key);
           out.push(terms.map(t => t.text || '').filter(Boolean).join(' | '));
           out.push(GP.formatMonths([...new Set(terms.flatMap(t => t.months || []))]));
+          out.push(terms.some(t => t.once) ? 'ano' : '');
         }
         else if (f.type === 'months') out.push(GP.formatMonths(v || []));
         else if (f.type === 'select') out.push(f.key === 'type' ? GP.typeLabel(v) : GP.optLabel(f.opts, v));

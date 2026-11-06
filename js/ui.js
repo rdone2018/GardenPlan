@@ -14,7 +14,7 @@
       if (o[k] == null || typeof o[k] !== 'object') o[k] = /^\d+$/.test(keys[i + 1] || last) ? [] : {};
       o = o[k];
     });
-    o[last] = value;
+    if (value === undefined) delete o[last]; else o[last] = value;
   };
 
   GP.ui.months = function (path, months) {
@@ -62,6 +62,9 @@
         return '<div class="care-terms" data-care="' + path + '">' + terms.map((t, i) => '<div class="term">' +
           '<textarea data-k="' + path + '.' + i + '.text" rows="2" placeholder="' + esc(L('Co a jak dělat…', 'What and how…')) + '">' + esc(t.text) + '</textarea>' +
           '<div class="care-months"><span class="muted small">' + esc(L('Kdy:', 'When:')) + '</span>' + GP.ui.months(path + '.' + i + '.months', t.months) +
+          '<label class="small once" title="' + esc(L('Stačí udělat jednou v kterémkoli z vybraných měsíců (např. natřít kmen). Bez zaškrtnutí se úkol opakuje každý měsíc (např. postřik).',
+            'Done once in any of the chosen months (e.g. painting the trunk). Unticked, the task repeats every month (e.g. spraying).')) + '"><input type="checkbox" data-k="' + path + '.' + i + '.once"' + (t.once ? ' checked' : '') + '> ' +
+            esc(L('jednorázově', 'once')) + '</label>' +
           (terms.length > 1 ? '<button type="button" class="link danger small" data-delterm="' + path + '" data-i="' + i + '">✕</button>' : '') + '</div></div>').join('') +
           '<button type="button" class="link small" data-addterm="' + path + '">+ ' + L('další termín', 'another time') + '</button></div>';
       }
@@ -105,14 +108,16 @@
     const changed = key => { GP.save(); if (onChange) onChange(key); };
     root.addEventListener('input', e => {
       const k = e.target.dataset.k;
-      if (!k || e.target.tagName === 'SELECT') return;
+      if (!k || e.target.tagName === 'SELECT' || e.target.type === 'checkbox') return;
       GP.setPath(obj, k, e.target.value);
       changed(k);
     });
     root.addEventListener('change', e => {
       const k = e.target.dataset.k;
-      if (!k || e.target.tagName !== 'SELECT') return;
-      const v = e.target.dataset.type === 'bool' ? (e.target.value === '' ? '' : e.target.value === '1') : e.target.value;
+      if (!k || (e.target.tagName !== 'SELECT' && e.target.type !== 'checkbox')) return;
+      // a ticked box stores true, an empty one nothing
+      const v = e.target.type === 'checkbox' ? (e.target.checked || undefined)
+        : e.target.dataset.type === 'bool' ? (e.target.value === '' ? '' : e.target.value === '1') : e.target.value;
       GP.setPath(obj, k, v);
       changed(k);
     });
