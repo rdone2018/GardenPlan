@@ -426,6 +426,10 @@ input.num { width: 4.5rem; }
 .ct-var label { padding-top: .1rem; }
 .ct-var mark { background: #f6e3a1; border-radius: 3px; padding: 0 1px; }
 .ct-cluster .field { margin-top: .6rem; }
+.once-row { display: grid; grid-template-columns: auto 1fr; gap: .6rem; align-items: start; padding: .45rem .3rem; border-top: 1px solid var(--line); cursor: pointer; }
+.once-row:hover { background: #f7f6f1; }
+.once-row.on { background: #fbf6e6; }
+.once-row input { margin-top: .2rem; }
 .once-tag { display: inline-block; font-size: .72rem; color: #7a6a2f; background: #f6efd6; border-radius: 99px; padding: 0 .45rem; margin-left: .2rem; cursor: help; }
 .care-months label.once { display: inline-flex; align-items: center; gap: .25rem; margin-left: .6rem; color: var(--muted); white-space: nowrap; }
 /* section icons on the calendar pages: one size, one width, so the headings line up */

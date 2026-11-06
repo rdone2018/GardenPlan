@@ -83,17 +83,95 @@
       (c.sameKey ? '' : '<button class="btn" data-act="keep" title="' + L('Texty mají být odlišné – už je tu nenabízet', 'The texts are meant to differ – do not offer them again') + '">' + L('Nechat jak je', 'Leave as is') + '</button>') + '</div></div>';
   }
 
+  // ---------- one-time care in bulk: one tick per care text marks every plant that uses it ----------
+  let tab = 'unify', q = '', onlyHints = false;
+  // suggested as one-time: winter protection, pruning and other care spread over several months (a cut or a cover
+  // is done once in them), and painting the trunk anywhere; watering, feeding and spraying repeat
+  const HINT_FIELDS = ['winter', 'pruning', 'otherCare'], HINT = /natr|nater|bilit/;
+
+  function onceGroups() {
+    const out = [];
+    for (const f of GP.PLANT_FIELDS.filter(x => x.type === 'care')) {
+      const by = new Map();
+      for (const p of GP.state.plants) for (const t of GP.careTerms(p, f.key)) {
+        if (!(t.months || []).length) continue;
+        const k = GP.textKey(t.text);
+        if (!by.has(k)) by.set(k, { f, key: f.key + ':' + k, terms: [], plants: new Set(), months: new Set() });
+        const g = by.get(k);
+        g.terms.push(t); g.plants.add(p);
+        t.months.forEach(m => g.months.add(m));
+      }
+      for (const g of by.values()) {
+        g.text = GP.mostUsed(g.terms.map(t => (t.text || '').trim())) || L('(bez textu)', '(no text)');
+        g.on = g.terms.filter(t => t.once).length;
+        g.hint = !g.on && g.months.size > 1 && (HINT_FIELDS.includes(f.key) || HINT.test(GP.textKey(g.text)));
+        out.push(g);
+      }
+    }
+    return out;
+  }
+  let groups = [];
+
+  function onceHtml() {
+    groups = onceGroups();
+    const nq = GP.norm(q);
+    const shown = groups.filter(g => (!nq || GP.norm(g.text + ' ' + [...g.plants].map(GP.plantName).join(' ')).includes(nq)) && (!onlyHints || g.hint));
+    const nOn = groups.filter(g => g.on).length;
+    let html = '<p class="muted small">' + L('Zaškrtnutím označíte péči jako jednorázovou u všech rostlin s tímto textem: stačí ji udělat jednou v kterémkoli z jejích měsíců. Nezaškrtnutá se opakuje každý měsíc (zálivka, postřik). Odškrtnutím se vše vrátí. 💡 = návrh: zimní ochrana, řez a další péče na víc měsíců, natírání kmene – přečtěte si text a rozhodněte.',
+        'Ticking marks the care as one-time for every plant with this text: done once in any of its months. Unticked it repeats every month (watering, spraying). Untick to undo. 💡 = suggestion: winter protection, pruning and other care over several months, painting the trunk – read the text and decide.') + '</p>' +
+      '<div class="row gap list-tools"><input type="search" data-q placeholder="' + L('Hledat v textu nebo rostlině…', 'Search text or plant…') + '" value="' + esc(q) + '">' +
+      '<label class="small"><input type="checkbox" data-hints' + (onlyHints ? ' checked' : '') + '> ' + L('jen návrhy 💡', 'suggestions only 💡') + ' (' + groups.filter(g => g.hint).length + ')</label>' +
+      '<span class="small muted">' + L('jednorázových textů: ', 'one-time texts: ') + nOn + '</span></div>';
+    for (const f of GP.PLANT_FIELDS.filter(x => x.type === 'care')) {
+      const gs = shown.filter(g => g.f === f).sort((a, b) => b.plants.size - a.plants.size || a.text.localeCompare(b.text, 'cs'));
+      if (!gs.length) continue;
+      html += '<div class="panel"><h3>' + (f.icon ? '<span class="ico">' + f.icon + '</span>' : '') + esc(GP.fieldLabel(f)) + ' <span class="muted">(' + gs.length + ')</span></h3>' +
+        gs.map(g => {
+          const names = [...g.plants].map(GP.plantName).sort((a, b) => a.localeCompare(b, 'cs'));
+          return '<label class="once-row' + (g.on ? ' on' : '') + '"><input type="checkbox" data-once="' + esc(g.key) + '"' + (g.on ? ' checked' : '') +
+            (g.on && g.on < g.terms.length ? ' data-some' : '') + '><div><div class="pre">' + (g.hint ? '💡 ' : '') + esc(g.text) + '</div>' +
+            '<div class="small muted">' + esc(GP.formatMonths([...g.months].sort((a, b) => a - b))) + ' · ' + g.plants.size + '× · ' +
+            esc(names.slice(0, 8).join(', ') + (names.length > 8 ? ' … +' + (names.length - 8) : '')) +
+            (g.on && g.on < g.terms.length ? ' · ' + L('jednorázově jen u ', 'one-time only for ') + g.on + '/' + g.terms.length : '') + '</div></div></label>';
+        }).join('') + '</div>';
+    }
+    return html + (shown.length ? '' : '<p class="muted">' + L('Nic neodpovídá.', 'Nothing matches.') + '</p>');
+  }
+
   GP.views.caretexts = {
     render() {
+      const tabs = '<div class="row gap" style="margin-bottom:.8rem"><button class="seg' + (tab === 'unify' ? ' on' : '') + '" data-tab="unify">' + L('Sjednotit texty', 'Unify texts') + '</button>' +
+        '<button class="seg' + (tab === 'once' ? ' on' : '') + '" data-tab="once">' + L('Jednorázově', 'One-time') + '</button></div>';
+      if (tab === 'once') return '<div class="head"><h1>' + L('Jednorázová péče', 'One-time care') + '</h1>' +
+        '<div class="row gap"><a class="btn" href="#/plants">← ' + L('Rostliny', 'Plants') + '</a></div></div>' + tabs + onceHtml();
       clusters = findClusters();
       return '<div class="head"><h1>' + L('Sjednotit texty péče', 'Unify care texts') + ' <span class="muted">(' + clusters.length + ')</span></h1>' +
-        '<div class="row gap"><a class="btn" href="#/plants">← ' + L('Rostliny', 'Plants') + '</a></div></div>' +
+        '<div class="row gap"><a class="btn" href="#/plants">← ' + L('Rostliny', 'Plants') + '</a></div></div>' + tabs +
         '<p class="muted small">' + L('Texty péče, které jsou skoro stejné. Po sjednocení je kalendář ukáže pohromadě pod jedním návodem. Kolečkem vyberte znění, které platí, zaškrtnutím ty texty, které se mají přepsat. Žlutě jsou slova, kterými se text od vybraného liší.',
           'Care texts that are almost the same. Once unified, the calendar lists those plants together under one instruction. Pick the wording that applies with the circle and tick the texts to be replaced. Words that differ from the chosen one are highlighted.') + '</p>' +
         ((GP.state.settings.careTextsKeep || []).length ? '<p class="small"><button class="link small" data-act="unkeep">' + L('Znovu ukázat skupiny ponechané jak jsou', 'Show groups left as they are again') + ' (' + GP.state.settings.careTextsKeep.length + ')</button></p>' : '') +
         (clusters.length ? clusters.map(clusterHtml).join('') : '<div class="empty"><p>' + L('Žádné podobné texty – vše je sjednocené. 🎉', 'No similar texts – all unified. 🎉') + '</p></div>');
     },
     mount(root) {
+      root.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; GP.render(); });
+      if (tab === 'once') {
+        root.querySelectorAll('[data-some]').forEach(c => { c.indeterminate = true; });
+        const s = root.querySelector('[data-q]');
+        s.oninput = () => {
+          q = s.value; GP.render();
+          const n = document.querySelector('[data-q]');
+          n.focus(); n.setSelectionRange(n.value.length, n.value.length);
+        };
+        root.querySelector('[data-hints]').onchange = e => { onlyHints = e.target.checked; GP.render(); };
+        root.querySelectorAll('[data-once]').forEach(c => c.onchange = () => {
+          const g = groups.find(x => x.key === c.dataset.once);
+          for (const t of g.terms) if (c.checked) t.once = true; else delete t.once;
+          GP.save();
+          GP.ui.toast((c.checked ? L('Jednorázově: ', 'One-time: ') : L('Opakovaně: ', 'Repeated: ')) + g.plants.size + '× ' + GP.fieldLabel(g.f).toLowerCase());
+          const y = scrollY; GP.render(); scrollTo(0, y);
+        });
+        return;
+      }
       const redraw = (box, c, ci) => { box.outerHTML = clusterHtml(c, ci); };
       root.addEventListener('change', e => {
         const box = e.target.closest('.ct-cluster');
