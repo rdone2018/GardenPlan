@@ -11,7 +11,7 @@
     ['data', '💾', 'Data', 'Data']
   ];
   const ROUTES = { '': 'dashboard', gardens: 'gardens', garden: 'garden', plants: 'plants', plant: 'plant',
-    import: 'import', calendar: 'calendar', tech: 'tech', equipment: 'equipment', data: 'data' };
+    import: 'import', calendar: 'calendar', tech: 'tech', equipment: 'equipment', data: 'data', caretexts: 'caretexts' };
 
   function route() {
     const parts = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
@@ -27,7 +27,7 @@
     document.documentElement.lang = GP.state.settings.lang;
 
     document.getElementById('nav').innerHTML = NAV.map(([path, icon, cs, en]) => {
-      const active = r.name === path || (path === 'gardens' && r.name === 'garden') || (path === 'plants' && (r.name === 'plant' || r.name === 'import')) ||
+      const active = r.name === path || (path === 'gardens' && r.name === 'garden') || (path === 'plants' && (r.name === 'plant' || r.name === 'import' || r.name === 'caretexts')) ||
         (path === 'tech' && r.name === 'equipment');
       return '<a href="#/' + path + '" class="' + (active ? 'active' : '') + '"><span>' + icon + '</span> ' + L(cs, en) + '</a>';
     }).join('');

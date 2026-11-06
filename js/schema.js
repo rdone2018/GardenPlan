@@ -6,6 +6,14 @@
   GP.norm = s => String(s == null ? '' : s)
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase().replace(/\s+/g, ' ').trim();
+  // Key under which two texts count as the same: case, accents, punctuation and spaces are ignored.
+  GP.textKey = s => GP.norm(s).replace(/[^a-z0-9]+/g, ' ').trim();
+  // The value that occurs most often (the first one on a tie).
+  GP.mostUsed = list => {
+    const n = new Map();
+    for (const v of list) n.set(v, (n.get(v) || 0) + 1);
+    return [...n].reduce((best, x) => (x[1] > best[1] ? x : best))[0];
+  };
 
   // ---------- months ----------
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];

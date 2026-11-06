@@ -181,12 +181,14 @@
         g.tasks.sort((x, y) => name(x).localeCompare(name(y), 'cs'));
         // within the group, plants with the same instruction go together under it (the biggest bunch first);
         // the plants with an instruction of their own follow, each with its text
+        // texts differing only in case, accents, commas or spaces count as the same; the most used wording is shown
         const byText = new Map();
-        for (const t of g.tasks) { const k = (t.text || '').trim(); if (!byText.has(k)) byText.set(k, []); byText.get(k).push(t); }
+        for (const t of g.tasks) { const k = GP.textKey(t.text); if (!byText.has(k)) byText.set(k, []); byText.get(k).push(t); }
         const shared = [...byText].filter(([k, ts]) => k && ts.length > 1).sort((x, y) => y[1].length - x[1].length);
-        const single = g.tasks.filter(t => !shared.some(([k]) => k === (t.text || '').trim()));
+        const single = g.tasks.filter(t => !shared.some(([k]) => k === GP.textKey(t.text)));
+        const wording = ts => GP.mostUsed(ts.map(t => t.text.trim()));
         return '<div class="care-grp">' + (g.label ? '<div class="grp-h">' + esc(g.label) + ' <span class="muted">(' + g.tasks.length + ')</span></div>' : '') +
-          shared.map(([k, ts]) => '<div class="grp-same"><div class="small muted pre grp-note">' + esc(k) + '</div><ul class="tasks">' + ts.map(t => li(t, name(t), true)).join('') + '</ul></div>').join('') +
+          shared.map(([, ts]) => '<div class="grp-same"><div class="small muted pre grp-note">' + esc(wording(ts)) + '</div><ul class="tasks">' + ts.map(t => li(t, name(t), true)).join('') + '</ul></div>').join('') +
           (single.length ? '<ul class="tasks">' + single.map(t => li(t, name(t))).join('') + '</ul>' : '') + '</div>';
       }).join('');
     };
