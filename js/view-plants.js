@@ -243,6 +243,19 @@
   };
 
   // ---------------- plant card ----------------
+  // Previous / next plant in the order of the catalog list (with its filters), so the database can be gone through
+  // one plant after another; a plant the filters no longer show (e.g. just completed) steps through the whole catalog.
+  function plantNav(p) {
+    let list = filtered();
+    if (!list.includes(p)) list = GP.state.plants.slice().sort((a, b) => GP.plantName(a).localeCompare(GP.plantName(b), 'cs'));
+    const i = list.indexOf(p), prev = list[i - 1], next = list[i + 1];
+    const link = (x, cls, label) => x ? '<a class="btn ' + cls + '" href="#/plant/' + x.id + '" title="' + esc(GP.plantName(x)) + '">' + label + '</a>' : '<span class="btn ' + cls + ' off">' + label + '</span>';
+    return '<div class="plant-nav">' +
+      link(prev, 'pn-prev', '← <span>' + L('předchozí', 'previous') + (prev ? ': <b>' + esc(GP.plantName(prev)) + '</b>' : '') + '</span>') +
+      '<span class="muted small">' + (i + 1) + ' / ' + list.length + (list.length < GP.state.plants.length ? ' ' + L('(podle filtru)', '(filtered)') : '') + '</span>' +
+      link(next, 'pn-next', '<span>' + L('další', 'next') + (next ? ': <b>' + esc(GP.plantName(next)) + '</b>' : '') + '</span> →') + '</div>';
+  }
+
   GP.views.plant = {
     render([id]) {
       const p = GP.byId('plants', id);
@@ -270,7 +283,7 @@
       let html = '<div class="head"><h1><a href="#/plants" class="back">←</a> <span id="pname">' + esc(GP.plantName(p)) + '</span></h1>' +
         '<div class="row gap"><span id="pbar">' + GP.ui.bar(pct) + '</span><button class="btn" data-act="lookup">🔎 ' + L('Doplnit z databází', 'Fill from databases') + '</button>' +
         '<button class="btn primary" data-act="save">💾 ' + L('Uložit', 'Save') + '</button>' +
-        '<button class="btn danger" data-act="del">' + L('Smazat', 'Delete') + '</button></div></div>' +
+        '<button class="btn danger" data-act="del">' + L('Smazat', 'Delete') + '</button></div></div>' + plantNav(p) +
         '<div class="plant-top"><div class="photo-box">' + (p.photo ? '<img src="' + p.photo + '" alt="">' : '<div class="ph">🌿</div>') +
         '<label class="btn small">📷 ' + (p.photo ? L('Změnit foto', 'Change photo') : L('Přidat foto', 'Add photo')) + '<input type="file" accept="image/*" data-act="photo" hidden></label>' +
         (p.photo ? ' <button class="link small danger" data-act="nophoto">✕</button>' : '') +
@@ -284,7 +297,8 @@
         html += '<details class="panel group" open><summary><h2>' + esc(g[0]) + '</h2><span class="muted small">' + esc(g[1]) + '</span></summary>' +
           (gi === 3 ? '<div id="careform">' + careHtml(p) + '</div>' : groupHtml(p, gi)) + '</details>';
       });
-      html += '</div>' + plantingsPanel(p);
+      // once more at the bottom, so after going through the card it is one tap to the next plant
+      html += '</div>' + plantingsPanel(p) + plantNav(p);
       return html;
     },
     mount(root, [id]) {

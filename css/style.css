@@ -426,6 +426,11 @@ input.num { width: 4.5rem; }
 .ct-var label { padding-top: .1rem; }
 .ct-var mark { background: #f6e3a1; border-radius: 3px; padding: 0 1px; }
 .ct-cluster .field { margin-top: .6rem; }
+/* previous / next plant on the plant card */
+.plant-nav { display: flex; align-items: center; justify-content: flex-end; gap: .6rem; margin: -.4rem 0 .8rem; }
+.plant-nav .btn { max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plant-nav .btn.off { opacity: .4; pointer-events: none; }
+@media (max-width: 640px) { .plant-nav { justify-content: space-between; } .plant-nav .btn { max-width: 40vw; } .plant-nav .btn b { display: none; } }
 .once-row { display: grid; grid-template-columns: auto 1fr; gap: .6rem; align-items: start; padding: .45rem .3rem; border-top: 1px solid var(--line); cursor: pointer; }
 .once-row:hover { background: #f7f6f1; }
 .once-row.on { background: #fbf6e6; }
