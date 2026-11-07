@@ -388,7 +388,7 @@
       const gsel = sowing ? '' : '<select data-c="garden"><option value="">' + L('Všechny zahrady', 'All gardens') + '</option>' + GP.state.gardens.map(g => '<option value="' + g.id + '"' + (cal.garden === g.id ? ' selected' : '') + '>' + esc(g.name) + '</option>').join('') + '</select>';
       const seg = (v, label) => '<button class="seg' + (cal.view === v ? ' on' : '') + '" data-view="' + v + '">' + label + '</button>';
       const title = sowing ? L('Plán výsevu a výsadby', 'Sowing and planting plan') : cal.view === 'bloom' ? L('Kvetení – celý rok', 'Flowering – whole year')
-        : cal.view === 'harvest' ? L('Zrání – celý rok', 'Ripening – whole year') : L('Kalendář péče', 'Care calendar');
+        : cal.view === 'harvest' ? L('Zrání – celý rok', 'Ripening – whole year') : L('Kalendář péče', 'Care calendar') + ' ' + new Date().getFullYear();
       let html = '<div class="head"><h1>' + title + '</h1><div class="row gap">' + gsel +
         seg('sow', '🪴 ' + L('Plán výsadby', 'Planting plan')) + seg('month', '🧰 ' + L('Péče – měsíc', 'Care – month')) + seg('year', L('Péče – celý rok', 'Care – whole year')) +
         seg('bloom', flower('#d36f9a') + ' ' + L('Kvetení – celý rok', 'Flowering – whole year')) + seg('harvest', '🍎 ' + L('Zrání – celý rok', 'Ripening – whole year')) + '</div></div>';
