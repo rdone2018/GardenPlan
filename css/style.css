@@ -426,6 +426,10 @@ input.num { width: 4.5rem; }
 .ct-var label { padding-top: .1rem; }
 .ct-var mark { background: #f6e3a1; border-radius: 3px; padding: 0 1px; }
 .ct-cluster .field { margin-top: .6rem; }
+/* plant card: what still has to be filled in */
+#pform .missing { background: #fdf0ee; box-shadow: inset 3px 0 0 #e7a597; border-radius: 6px; }
+#pform .field.missing { padding: .25rem .4rem; margin: -.25rem -.4rem; }
+.miss-n { margin-left: .6rem; padding: 0 .5rem; border-radius: 99px; background: #fbe1dc; color: #a33a26; font-size: .78rem; font-weight: 600; }
 /* previous / next plant on the plant card */
 .plant-nav { display: flex; align-items: center; justify-content: flex-end; gap: .6rem; margin: -.4rem 0 .8rem; }
 .plant-nav .btn { max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -66,6 +66,30 @@
     }).join('') + '</span>';
   }
 
+  // Plant card: fields that count as missing get a light red background, and each section heading says how many
+  // are missing there, so the gaps are easy to find on a long card. Called again after every edit.
+  function markMissing(root, p) {
+    const form = root.querySelector('#pform');
+    if (!form) return;
+    form.querySelectorAll('.missing').forEach(el => el.classList.remove('missing'));
+    form.querySelectorAll('.miss-n').forEach(el => el.remove());
+    const sections = form.querySelectorAll('details.group');
+    const count = new Map();
+    for (const f of GP.countedFields(p)) {
+      if (GP.isFilled(p, f)) continue;
+      const el = form.querySelector('[data-care="' + f.key + '"], [data-multi="' + f.key + '"], [data-months="' + f.key + '"], [data-k="' + f.key + '"]');
+      const box = el && (el.closest('details.care-item') || el.closest('.field'));
+      if (!box) continue;
+      box.classList.add('missing');
+      const sec = box.closest('details.group');
+      count.set(sec, (count.get(sec) || 0) + 1);
+    }
+    sections.forEach(sec => {
+      const n = count.get(sec);
+      if (n) sec.querySelector('summary').insertAdjacentHTML('beforeend', '<span class="miss-n">' + L('chybí ', 'missing ') + n + '</span>');
+    });
+  }
+
   // Twelve small cells, one per month (I–XII), the given months filled in – shows at a glance when a plant flowers or ripens.
   const BLOOM = '#d36f9a', HARVEST = '#c2552d';
   function monthStrip(months, color, title) {
@@ -320,7 +344,9 @@
         // fields shown only for some choices (crop, sowing, toxic for…) -> redraw the card where it was
         if (['type', 'purpose', 'crop', 'sowOutside', 'toxicParts'].includes(key)) { const y = scrollY; GP.render(); scrollTo(0, y); return; }
         root.querySelector('#pbar').innerHTML = GP.ui.bar(GP.completeness(p));
+        markMissing(root, p);
       });
+      markMissing(root, p);
       form.addEventListener('click', e => {
         const add = e.target.closest('[data-addterm]'), del = e.target.closest('[data-delterm]');
         if (!add && !del) return;
@@ -328,7 +354,7 @@
         const terms = GP.careTerms(p, key).slice();
         if (add) { if (!terms.length) terms.push({}); terms.push({}); } else terms.splice(+del.dataset.i, 1);
         p[key] = terms;
-        GP.save(); careRedraw();
+        GP.save(); careRedraw(); markMissing(root, p);
       });
       root.querySelector('[data-act=unsure]').onchange = e => {
         if (e.target.checked) p.unsure = true; else delete p.unsure;
