@@ -68,14 +68,16 @@
   // [4,5,9] -> "IV–V, IX" (CZ) / "Apr–May, Sep" (EN)
   GP.formatMonths = function (months) {
     if (!months || !months.length) return '';
-    const ms = [...months].sort((a, b) => a - b), parts = [];
+    const ms = [...new Set(months)].sort((a, b) => a - b), runs = [];
     let start = ms[0], prev = ms[0];
     for (let i = 1; i <= ms.length; i++) {
       if (ms[i] === prev + 1) { prev = ms[i]; continue; }
-      parts.push(start === prev ? GP.monthShort(start) : GP.monthShort(start) + '–' + GP.monthShort(prev));
+      runs.push([start, prev]);
       start = prev = ms[i];
     }
-    return parts.join(', ');
+    // a run over New Year is written as one ("XI–III", not "I–III, XI–XII"); parseMonths reads it back the same
+    if (runs.length > 1 && runs[0][0] === 1 && runs[runs.length - 1][1] === 12) runs.push([runs.pop()[0], runs.shift()[1]]);
+    return runs.map(([a, b]) => (a === b ? GP.monthShort(a) : GP.monthShort(a) + '–' + GP.monthShort(b))).join(', ');
   };
 
   // ---------- option lists: [key, cs, en, match regex (diacritics-free), colour] ----------
