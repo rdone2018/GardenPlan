@@ -161,7 +161,7 @@
       const head = '<div class="head"><h1>' + L('Rostliny', 'Plants') + ' <span class="muted">(' + all.length + ')</span></h1>' +
         '<div class="row gap">' + (all.length ? '<button class="btn" data-act="bulk" title="' + L('Pro rostliny ve výběru bez latinského názvu nebo bez fotky', 'For plants in the list without a Latin name or photo') + '">🔎 ' + L('Doplnit z databází', 'Fill from databases') + '</button>' : '') +
         (all.some(p => p.cultivar) ? '<button class="btn" data-act="cvphotos" title="' + L('Fotky přímo dané odrůdy z Wikimedia Commons', 'Photos of the exact cultivar from Wikimedia Commons') + '">🖼 ' + L('Fotky odrůd', 'Cultivar photos') + '</button>' : '') +
-        (all.length ? '<a class="btn" href="#/caretexts" title="' + L('Najít skoro stejné texty péče a sjednotit je', 'Find almost identical care texts and unify them') + '">✏️ ' + L('Texty péče', 'Care texts') + '</a>' : '') +
+        (all.length ? '<a class="btn" href="#/caretexts" title="' + L('Porovnat péči rostlin stejného rodu nebo druhu a sjednotit ji', 'Compare the care of plants of one genus or species and unify it') + '">✏️ ' + L('Péče podle rodu', 'Care by genus') + '</a>' : '') +
         '<a class="btn" href="#/import">⬆ ' + L('Import CSV', 'Import CSV') + '</a><button class="btn" data-act="export">⬇ ' + L('Export CSV', 'Export CSV') + '</button>' +
         '<button class="btn primary" data-act="new">+ ' + L('Nová rostlina', 'New plant') + '</button></div></div>';
       if (!all.length) {

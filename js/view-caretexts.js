@@ -252,11 +252,13 @@
 
   GP.views.caretexts = {
     render() {
-      const tabs = '<div class="row gap" style="margin-bottom:.8rem"><button class="seg' + (tab === 'genus' ? ' on' : '') + '" data-tab="genus">' + L('Podle rodu', 'By genus') + '</button>' +
-        '<button class="seg' + (tab === 'unify' ? ' on' : '') + '" data-tab="unify">' + L('Sjednotit texty', 'Unify texts') + '</button>' +
-        '<button class="seg' + (tab === 'once' ? ' on' : '') + '" data-tab="once">' + L('Jednorázově', 'One-time') + '</button></div>';
+      // the older tools are tucked away below the comparison by genus, which covers most of what they did
+      const tabs = '<div class="row gap" style="margin-bottom:.8rem"><button class="btn small" data-tab="genus">← ' + L('Péče podle rodu', 'Care by genus') + '</button></div>';
+      const more = '<p class="small muted gn-more">' + L('Další nástroje: ', 'More tools: ') +
+        '<button class="link small" data-tab="unify">' + L('Sjednotit skoro stejné texty napříč rody', 'Unify almost identical texts across genera') + '</button> · ' +
+        '<button class="link small" data-tab="once">' + L('Jednorázová péče hromadně', 'One-time care in bulk') + '</button></p>';
       if (tab === 'genus') return '<div class="head"><h1>' + L('Péče podle rodu', 'Care by genus') + '</h1>' +
-        '<div class="row gap"><a class="btn" href="#/plants">← ' + L('Rostliny', 'Plants') + '</a></div></div>' + tabs + genusHtml();
+        '<div class="row gap"><a class="btn" href="#/plants">← ' + L('Rostliny', 'Plants') + '</a></div></div>' + genusHtml() + more;
       if (tab === 'once') return '<div class="head"><h1>' + L('Jednorázová péče', 'One-time care') + '</h1>' +
         '<div class="row gap"><a class="btn" href="#/plants">← ' + L('Rostliny', 'Plants') + '</a></div></div>' + tabs + onceHtml();
       clusters = findClusters();
