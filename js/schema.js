@@ -296,6 +296,9 @@
     foliage: p => ['annual', 'biennial'].includes(p.type),
     harvestMonths: p => p.fruit !== 'edible' && !p.crop,
     depth: p => !sown(p) && p.type !== 'bulb',
+    // sown straight outdoors: planting out and sowing indoors (pre-growing) are optional
+    plantMonths: p => sown(p) && p.sowOutside === 'yes',
+    sowInMonths: p => sown(p) && p.sowOutside === 'yes',
     bearing: true
   };
   // Everything the card shows for this plant that should be filled in (care: only the items ticked under maintenance).
