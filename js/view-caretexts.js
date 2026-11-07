@@ -108,6 +108,8 @@
     for (const g of by.values()) {
       if (g.plants.length < 2) continue;
       g.plants.sort((a, b) => GP.plantName(a).localeCompare(GP.plantName(b), 'cs'));
+      // the common names (Jabloň, Višeň…) – easier to find than the Latin genus
+      g.common = [...new Set(g.plants.map(p => (L(p.name_cs, p.name_en) || p.name_cs || '').trim()).filter(Boolean))];
       g.diffs = [];
       g.kept = 0;
       for (const f of [GP.plantField('maintenance'), ...careFields()]) {
@@ -126,7 +128,7 @@
       }
       out.push(g);
     }
-    return out.sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+    return out.sort((a, b) => (a.common[0] || a.name).localeCompare(b.common[0] || b.name, 'cs'));
   }
 
   function variantHtml(g, gi, d, di, v, vi) {
@@ -152,18 +154,19 @@
     genera = genusGroups();
     const nq = GP.norm(gq);
     const shown = genera.filter(g => (allGenera || g.diffs.length) &&
-      (!nq || GP.norm(g.name + ' ' + g.plants.map(GP.plantName).join(' ')).includes(nq)));
+      (!nq || GP.norm(g.name + ' ' + g.common.join(' ') + ' ' + g.plants.map(GP.plantName).join(' ')).includes(nq)));
     const nDiff = genera.filter(g => g.diffs.length).length;
     let html = '<p class="muted small">' + L('Rostliny stejného rodu obvykle potřebují stejnou péči. U každého rodu je vidět, v čem se jeho rostliny liší (text, měsíce, jednorázově). „Použít u všech“ zkopíruje vybranou variantu ke zbylým rostlinám rodu. „Nechat jak je“ = rozdíl je správně (např. letní a podzimní maliníky).',
         'Plants of one genus usually need the same care. For each genus you see where its plants differ (text, months, one-time). "Use for all" copies that variant to the other plants of the genus. "Leave as is" = the difference is right (e.g. summer and autumn raspberries).') + '</p>' +
-      '<div class="row gap list-tools"><span><button class="seg' + (bySpecies ? '' : ' on') + '" data-sp="0">' + L('Rod', 'Genus') + '</button>' +
-      '<button class="seg' + (bySpecies ? ' on' : '') + '" data-sp="1">' + L('Druh', 'Species') + '</button></span><input type="search" data-gq placeholder="' + L('Hledat rod, druh nebo rostlinu…', 'Search genus, species or plant…') + '" value="' + esc(gq) + '">' +
+      '<div class="row gap list-tools"><span><button class="seg' + (bySpecies ? '' : ' on') + '" data-sp="0" title="' + L('Širší skupina, např. Prunus = višeň, švestka, třešeň, bobkovišeň', 'Wider group, e.g. Prunus = cherry, plum, cherry laurel') + '">' + L('Rod (široce)', 'Genus (wide)') + '</button>' +
+      '<button class="seg' + (bySpecies ? ' on' : '') + '" data-sp="1" title="' + L('Užší skupina, např. jen višně nebo jen jabloně', 'Narrower group, e.g. only sour cherries or only apples') + '">' + L('Druh (přesně)', 'Species (exact)') + '</button></span><input type="search" data-gq placeholder="' + L('Hledat rod, druh nebo rostlinu…', 'Search genus, species or plant…') + '" value="' + esc(gq) + '">' +
       '<label class="small"><input type="checkbox" data-allg' + (allGenera ? ' checked' : '') + '> ' + L('ukázat i rody bez rozdílů', 'show genera without differences too') + '</label>' +
       '<span class="small muted">' + (bySpecies ? L('druhů s rozdíly: ', 'species with differences: ') : L('rodů s rozdíly: ', 'genera with differences: ')) + nDiff + ' / ' + genera.length + '</span>' +
       ((GP.state.settings.genusKeep || []).length ? '<button class="link small" data-act="gunkeep">' + L('Znovu ukázat ponechané', 'Show kept ones again') + ' (' + GP.state.settings.genusKeep.length + ')</button>' : '') + '</div>';
     html += shown.map(g => {
       const gi = genera.indexOf(g);
-      return '<div class="panel gn-genus"><h3><i>' + esc(g.name) + '</i> <span class="muted">(' + g.plants.length + ')</span> ' +
+      const common = g.common.slice(0, 4).join(', ') + (g.common.length > 4 ? ' …' : '');
+      return '<div class="panel gn-genus"><h3>' + (common ? esc(common) + ' · ' : '') + '<i class="muted">' + esc(g.name) + '</i> <span class="muted">(' + g.plants.length + ')</span> ' +
         (g.diffs.length ? '<span class="miss-n">' + g.diffs.length + '</span>' : '<span class="small muted">✓ ' + L('stejná péče', 'same care') + '</span>') +
         (g.kept ? ' <span class="small muted">· ' + L('ponecháno: ', 'kept: ') + g.kept + '</span>' : '') + '</h3>' +
         (g.diffs.length ? '' : '<div class="small muted">' + g.plants.map(p => '<a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a>').join(', ') + '</div>') +
