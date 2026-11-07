@@ -435,6 +435,10 @@ input.num { width: 4.5rem; }
 .plant-nav .btn { max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plant-nav .btn.off { opacity: .4; pointer-events: none; }
 @media (max-width: 640px) { .plant-nav { justify-content: space-between; } .plant-nav .btn { max-width: 40vw; } .plant-nav .btn b { display: none; } }
+.gn-field { border-top: 1px solid var(--line); padding: .5rem 0 .2rem; }
+.gn-var { display: flex; gap: .6rem; align-items: flex-start; padding: .4rem 0 .4rem .9rem; border-left: 3px solid var(--line); margin: .3rem 0; }
+.gn-var .btn { flex-shrink: 0; }
+.gn-term + .gn-term { margin-top: .2rem; }
 .once-row { display: grid; grid-template-columns: auto 1fr; gap: .6rem; align-items: start; padding: .45rem .3rem; border-top: 1px solid var(--line); cursor: pointer; }
 .once-row:hover { background: #f7f6f1; }
 .once-row.on { background: #fbf6e6; }

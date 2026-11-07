@@ -83,8 +83,117 @@
       (c.sameKey ? '' : '<button class="btn" data-act="keep" title="' + L('Texty mají být odlišné – už je tu nenabízet', 'The texts are meant to differ – do not offer them again') + '">' + L('Nechat jak je', 'Leave as is') + '</button>') + '</div></div>';
   }
 
+  // ---------- by genus: plants of one genus usually need the same care; differences are listed side by side ----------
+  // by species when one genus mixes different crops (tomato and potato are both Solanum)
+  let gq = '', allGenera = false, genera = [], bySpecies = false;
+  const groupName = p => bySpecies ? (p.name_la || '').trim().split(/\s+/).slice(0, 2).join(' ') : (p.genus || '').trim();
+  const careFields = () => GP.PLANT_FIELDS.filter(x => x.type === 'care');
+  // what a plant has in one care item, ignoring commas and capitals; maintenance is compared as a set of chips
+  const termsOf = (p, f) => GP.careTerms(p, f.key).filter(t => (t.text || '').trim() || (t.months || []).length);
+  function sigOf(p, f) {
+    if (f.key === 'maintenance') return [...(p.maintenance || [])].sort().join(',');
+    return JSON.stringify(termsOf(p, f).map(t => [GP.textKey(t.text), [...(t.months || [])].sort((a, b) => a - b), !!t.once]));
+  }
+
+  function genusGroups() {
+    const by = new Map();
+    for (const p of GP.state.plants) {
+      const name = groupName(p), k = GP.norm(name);
+      if (!k) continue;
+      if (!by.has(k)) by.set(k, { name, plants: [] });
+      by.get(k).plants.push(p);
+    }
+    const keep = new Set(GP.state.settings.genusKeep || []);
+    const out = [];
+    for (const g of by.values()) {
+      if (g.plants.length < 2) continue;
+      g.plants.sort((a, b) => GP.plantName(a).localeCompare(GP.plantName(b), 'cs'));
+      g.diffs = [];
+      g.kept = 0;
+      for (const f of [GP.plantField('maintenance'), ...careFields()]) {
+        const vars = new Map();
+        for (const p of g.plants) {
+          const s = sigOf(p, f);
+          if (!vars.has(s)) vars.set(s, { sig: s, plants: [] });
+          vars.get(s).plants.push(p);
+        }
+        if (vars.size < 2) continue;
+        const vs = [...vars.values()].sort((a, b) => b.plants.length - a.plants.length);
+        // "leave as is" holds only while the plants stay as they were when it was clicked
+        const keepSig = g.name + '|' + f.key + '|' + vs.map(v => v.sig).sort().join('#');
+        if (keep.has(keepSig)) { g.kept++; continue; }
+        g.diffs.push({ f, vars: vs, keepSig });
+      }
+      out.push(g);
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+  }
+
+  function variantHtml(g, gi, d, di, v, vi) {
+    const model = v.plants[0];
+    let body;
+    if (d.f.key === 'maintenance') {
+      const opts = new Map((d.f.opts || []).map(o => [o[0], L(o[1], o[2])]));
+      body = (model.maintenance || []).length ? esc(model.maintenance.map(k => opts.get(k) || k).join(', ')) : '<span class="muted">' + L('nevyplněno', 'empty') + '</span>';
+    } else {
+      const ts = termsOf(model, d.f);
+      body = ts.length ? ts.map(t => '<div class="gn-term"><span class="pre">' + esc(t.text || '') + '</span> <span class="small muted">' +
+        esc(GP.formatMonths([...(t.months || [])].sort((a, b) => a - b)) || L('bez měsíců', 'no months')) + (t.once ? ' · ' + L('jednorázově', 'one-time') : '') + '</span></div>').join('')
+        : '<span class="muted">' + L('nevyplněno', 'empty') + '</span>';
+    }
+    const others = g.plants.length - v.plants.length;
+    return '<div class="gn-var"><div class="grow">' + body +
+      '<div class="small muted">' + v.plants.length + '× · ' + v.plants.map(p => '<a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a>').join(', ') + '</div></div>' +
+      '<button class="btn small" data-apply="' + gi + ':' + di + ':' + vi + '" title="' + L('Zkopírovat tuto péči ke zbylým rostlinám rodu', 'Copy this care to the other plants of the genus') + '">' +
+      L('Použít u všech', 'Use for all') + ' (+' + others + ')</button></div>';
+  }
+
+  function genusHtml() {
+    genera = genusGroups();
+    const nq = GP.norm(gq);
+    const shown = genera.filter(g => (allGenera || g.diffs.length) &&
+      (!nq || GP.norm(g.name + ' ' + g.plants.map(GP.plantName).join(' ')).includes(nq)));
+    const nDiff = genera.filter(g => g.diffs.length).length;
+    let html = '<p class="muted small">' + L('Rostliny stejného rodu obvykle potřebují stejnou péči. U každého rodu je vidět, v čem se jeho rostliny liší (text, měsíce, jednorázově). „Použít u všech“ zkopíruje vybranou variantu ke zbylým rostlinám rodu. „Nechat jak je“ = rozdíl je správně (např. letní a podzimní maliníky).',
+        'Plants of one genus usually need the same care. For each genus you see where its plants differ (text, months, one-time). "Use for all" copies that variant to the other plants of the genus. "Leave as is" = the difference is right (e.g. summer and autumn raspberries).') + '</p>' +
+      '<div class="row gap list-tools"><span><button class="seg' + (bySpecies ? '' : ' on') + '" data-sp="0">' + L('Rod', 'Genus') + '</button>' +
+      '<button class="seg' + (bySpecies ? ' on' : '') + '" data-sp="1">' + L('Druh', 'Species') + '</button></span><input type="search" data-gq placeholder="' + L('Hledat rod, druh nebo rostlinu…', 'Search genus, species or plant…') + '" value="' + esc(gq) + '">' +
+      '<label class="small"><input type="checkbox" data-allg' + (allGenera ? ' checked' : '') + '> ' + L('ukázat i rody bez rozdílů', 'show genera without differences too') + '</label>' +
+      '<span class="small muted">' + (bySpecies ? L('druhů s rozdíly: ', 'species with differences: ') : L('rodů s rozdíly: ', 'genera with differences: ')) + nDiff + ' / ' + genera.length + '</span>' +
+      ((GP.state.settings.genusKeep || []).length ? '<button class="link small" data-act="gunkeep">' + L('Znovu ukázat ponechané', 'Show kept ones again') + ' (' + GP.state.settings.genusKeep.length + ')</button>' : '') + '</div>';
+    html += shown.map(g => {
+      const gi = genera.indexOf(g);
+      return '<div class="panel gn-genus"><h3><i>' + esc(g.name) + '</i> <span class="muted">(' + g.plants.length + ')</span> ' +
+        (g.diffs.length ? '<span class="miss-n">' + g.diffs.length + '</span>' : '<span class="small muted">✓ ' + L('stejná péče', 'same care') + '</span>') +
+        (g.kept ? ' <span class="small muted">· ' + L('ponecháno: ', 'kept: ') + g.kept + '</span>' : '') + '</h3>' +
+        (g.diffs.length ? '' : '<div class="small muted">' + g.plants.map(p => '<a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a>').join(', ') + '</div>') +
+        g.diffs.map((d, di) => '<div class="gn-field"><div class="row gap"><b class="grow">' + (d.f.icon ? '<span class="ico">' + d.f.icon + '</span>' : '') + esc(GP.fieldLabel(d.f)) + '</b>' +
+          '<button class="link small" data-gkeep="' + gi + ':' + di + '">' + L('Nechat jak je', 'Leave as is') + '</button></div>' +
+          d.vars.map((v, vi) => variantHtml(g, gi, d, di, v, vi)).join('') + '</div>').join('') + '</div>';
+    }).join('');
+    return html + (shown.length ? '' : '<div class="empty"><p>' + (nq ? L('Nic neodpovídá.', 'Nothing matches.') : L('Všechny rody mají stejnou péči. 🎉', 'All genera have the same care. 🎉')) + '</p></div>');
+  }
+
+  // copies one variant (care terms or maintenance chips) to every other plant of the genus
+  function applyVariant(g, d, v) {
+    const model = v.plants[0], f = d.f;
+    let n = 0;
+    for (const p of g.plants) {
+      if (v.plants.includes(p)) continue;
+      if (f.key === 'maintenance') p.maintenance = [...(model.maintenance || [])];
+      else {
+        const ts = termsOf(model, f);
+        if (ts.length) p[f.key] = JSON.parse(JSON.stringify(ts)); else delete p[f.key];
+        // filled care is expected only when its maintenance chip is ticked
+        if (ts.length && f.maint && !(p.maintenance || []).includes(f.maint)) p.maintenance = [...(p.maintenance || []).filter(k => k !== 'none'), f.maint];
+      }
+      n++;
+    }
+    return n;
+  }
+
   // ---------- one-time care in bulk: one tick per care text marks every plant that uses it ----------
-  let tab = 'unify', q = '', onlyHints = false;
+  let tab = 'genus', q = '', onlyHints = false;
   // suggested as one-time: winter protection, pruning and other care spread over several months (a cut or a cover
   // is done once in them), and painting the trunk anywhere; watering, feeding and spraying repeat
   const HINT_FIELDS = ['winter', 'pruning', 'otherCare'], HINT = /natr|nater|bilit/;
@@ -140,8 +249,11 @@
 
   GP.views.caretexts = {
     render() {
-      const tabs = '<div class="row gap" style="margin-bottom:.8rem"><button class="seg' + (tab === 'unify' ? ' on' : '') + '" data-tab="unify">' + L('Sjednotit texty', 'Unify texts') + '</button>' +
+      const tabs = '<div class="row gap" style="margin-bottom:.8rem"><button class="seg' + (tab === 'genus' ? ' on' : '') + '" data-tab="genus">' + L('Podle rodu', 'By genus') + '</button>' +
+        '<button class="seg' + (tab === 'unify' ? ' on' : '') + '" data-tab="unify">' + L('Sjednotit texty', 'Unify texts') + '</button>' +
         '<button class="seg' + (tab === 'once' ? ' on' : '') + '" data-tab="once">' + L('Jednorázově', 'One-time') + '</button></div>';
+      if (tab === 'genus') return '<div class="head"><h1>' + L('Péče podle rodu', 'Care by genus') + '</h1>' +
+        '<div class="row gap"><a class="btn" href="#/plants">← ' + L('Rostliny', 'Plants') + '</a></div></div>' + tabs + genusHtml();
       if (tab === 'once') return '<div class="head"><h1>' + L('Jednorázová péče', 'One-time care') + '</h1>' +
         '<div class="row gap"><a class="btn" href="#/plants">← ' + L('Rostliny', 'Plants') + '</a></div></div>' + tabs + onceHtml();
       clusters = findClusters();
@@ -154,6 +266,36 @@
     },
     mount(root) {
       root.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; GP.render(); });
+      if (tab === 'genus') {
+        const s = root.querySelector('[data-gq]');
+        s.oninput = () => {
+          gq = s.value; GP.render();
+          const n = document.querySelector('[data-gq]');
+          n.focus(); n.setSelectionRange(n.value.length, n.value.length);
+        };
+        root.querySelectorAll('[data-sp]').forEach(b => b.onclick = () => { bySpecies = b.dataset.sp === '1'; GP.render(); });
+        root.querySelector('[data-allg]').onchange = e => { allGenera = e.target.checked; GP.render(); };
+        root.addEventListener('click', e => {
+          const b = e.target.closest('[data-apply],[data-gkeep],[data-act=gunkeep]');
+          if (!b) return;
+          const y = scrollY;
+          if (b.dataset.act === 'gunkeep') delete GP.state.settings.genusKeep;
+          else if (b.dataset.gkeep) {
+            const [gi, di] = b.dataset.gkeep.split(':').map(Number);
+            GP.state.settings.genusKeep = [...(GP.state.settings.genusKeep || []), genera[gi].diffs[di].keepSig];
+          } else {
+            const [gi, di, vi] = b.dataset.apply.split(':').map(Number);
+            const g = genera[gi], d = g.diffs[di], v = d.vars[vi];
+            if (!confirm(L('Použít u všech rostlin ' + g.name + ' (' + GP.fieldLabel(d.f) + ')? Přepíše se u ' + (g.plants.length - v.plants.length) + ' rostlin.',
+              'Use for all ' + g.name + ' (' + GP.fieldLabel(d.f) + ')? This overwrites ' + (g.plants.length - v.plants.length) + ' plants.'))) return;
+            const n = applyVariant(g, d, v);
+            GP.ui.toast(L('Zkopírováno: ', 'Copied: ') + n + '× ' + GP.fieldLabel(d.f).toLowerCase());
+          }
+          GP.save();
+          GP.render(); scrollTo(0, y);
+        });
+        return;
+      }
       if (tab === 'once') {
         root.querySelectorAll('[data-some]').forEach(c => { c.indeterminate = true; });
         const s = root.querySelector('[data-q]');
