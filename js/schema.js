@@ -145,7 +145,7 @@
       return [String(n), n + ' (' + lo + ' až ' + hi + ' °C)', n + ' (' + lo + ' to ' + hi + ' °C)'];
     }),
     maintenance: [['none', 'žádná', 'none', 'zadn|^ne$|^no$|none'], ['water', 'zálivka', 'watering', 'zaliv|water'], ['fert', 'hnojení', 'fertilising', 'hnoj|fert'], ['prune', 'zastřihávání / řez', 'trimming / pruning', 'rez|strih|prun|trim'],
-      ['pests', 'ošetření proti chorobám a škůdcům', 'disease & pest control', 'chorob|skud|postrik|pest|diseas'], ['frost', 'ochrana proti mrazu', 'frost protection', 'mraz|zim|frost|winter']],
+      ['diseases', 'ošetření proti chorobám', 'disease control', 'chorob|plisen|houb|postrik|diseas'], ['pests', 'ošetření proti škůdcům', 'pest control', 'skud|skodc|postrik|pest'], ['frost', 'ochrana proti mrazu', 'frost protection', 'mraz|zim|frost|winter']],
     support: [['none', 'není potřeba', 'not needed', 'nepotreb|bez|none|no'], ['stake', 'kůl při výsadbě', 'stake when planting', 'kul|stake'],
       ['permanent', 'trvalá opora (treláž, pergola, drát)', 'permanent support (trellis, pergola, wire)', 'trval|trelaz|pergol|drat|trellis|permanent']],
     growth: [['slow', 'pomalá', 'slow', 'pomal|slow'], ['medium', 'střední', 'medium', 'stred|medium'], ['fast', 'rychlá', 'fast', 'rychl|fast']],
@@ -243,7 +243,7 @@
     F('fertilizing', 3, 'care', 'Hnojení', 'Fertilising', ['hnojeni', 'hnojenie', 'fertilizing', 'fertilising', 'feeding'], { maint: 'fert', icon: '🧪' }),
     F('pruning', 3, 'care', 'Řez / střih', 'Pruning / trimming', ['rez', 'rez1', 'rez 1', 'rez2', 'rez 2', 'strih', 'strihanie', 'pruning', 'pruning 1', 'pruning 2'], { maint: 'prune', icon: '✂️' }),
     F('winter', 3, 'care', 'Ochrana na zimu', 'Winter protection', ['ochrana rostlin na zimu', 'ochrana na zimu', 'zimni ochrana', 'zima', 'winter protection', 'winter'], { maint: 'frost', icon: '❄️' }),
-    F('diseases', 3, 'care', 'Ošetření proti chorobám', 'Disease control', ['choroby', 'choroby a skudci', 'choroby a skodcovia', 'diseases'], { maint: 'pests', icon: '🍂' }),
+    F('diseases', 3, 'care', 'Ošetření proti chorobám', 'Disease control', ['choroby', 'choroby a skudci', 'choroby a skodcovia', 'diseases'], { maint: 'diseases', icon: '🍂' }),
     F('pests', 3, 'care', 'Ošetření proti škůdcům', 'Pest control', ['skudci', 'skodcovia', 'pests'], { maint: 'pests', icon: '🐛' }),
     F('otherCare', 3, 'care', 'Další péče', 'Other care', ['dalsi pece', 'pece', 'other care', 'care'], { icon: '🌱' }),
     F('notes', 3, 'longtext', 'Poznámky', 'Notes', ['poznamky', 'poznamka', 'notes', 'note', '!!!', 'dulezite', 'pozor', 'warning', 'important'])
@@ -374,21 +374,38 @@
   };
 
   // Bring a plant stored with an older field set to the current one (idempotent, returns true when changed).
-  GP.PLANT_VERSION = 3;
+  GP.PLANT_VERSION = 4;
   GP.migratePlant = function (p) {
     const from = p.v || 1;
     if (from >= GP.PLANT_VERSION) return false;
-    if (from < 2) migrate2(p);
-    else {
-      // version 2 kept sizes in metres (numbers over 60 were clearly typed in cm already)
-      const big = v => Math.max(0, ...(String(v || '').match(/\d+(?:[.,]\d+)?/g) || []).map(n => parseFloat(n.replace(',', '.')))) > 60;
-      for (const k of ['height', 'width']) if (p[k]) p[k] = GP.toCm(p[k], big(p[k]) ? 'cm' : 'm');
+    if (from < 3) {
+      if (from < 2) migrate2(p);
+      else {
+        // version 2 kept sizes in metres (numbers over 60 were clearly typed in cm already)
+        const big = v => Math.max(0, ...(String(v || '').match(/\d+(?:[.,]\d+)?/g) || []).map(n => parseFloat(n.replace(',', '.')))) > 60;
+        for (const k of ['height', 'width']) if (p[k]) p[k] = GP.toCm(p[k], big(p[k]) ? 'cm' : 'm');
+      }
+      migrate3(p);
+      for (const k of ['height', 'width']) if (!p[k]) delete p[k];
     }
-    migrate3(p);
-    for (const k of ['height', 'width']) if (!p[k]) delete p[k];
+    migrate4(p);
     p.v = GP.PLANT_VERSION;
     return true;
   };
+  // v4: "disease & pest control" under maintenance split in two; a plant gets the ones whose care is filled in
+  // (both when neither or both are)
+  function migrate4(p) {
+    const m = p.maintenance;
+    if (!Array.isArray(m) || !m.includes('pests')) return;
+    const filled = key => GP.careTerms(p, key).some(t => (t.text && t.text.trim()) || (t.months && t.months.length));
+    const d = filled('diseases'), q = filled('pests');
+    const out = [];
+    for (const k of m) {
+      if (k !== 'pests') out.push(k);
+      else { if (d || !q) out.push('diseases'); if (q || !d) out.push('pests'); }
+    }
+    p.maintenance = out;
+  }
   // v3: type = growth form only; the rest moves to crop / leaf type / shape; water may hold several choices
   function migrate3(p) {
     const T = {
