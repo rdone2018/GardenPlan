@@ -175,6 +175,8 @@
   GP.subLabel = k => (SUB[k] ? L(SUB[k][0], SUB[k][1]) : '');
   // sowing only makes sense for herbaceous crops and short-lived plants
   const sown = p => ['annual', 'biennial'].includes(p.type) || ['vegetable', 'herb'].includes(p.crop);
+  // vegetables grown for the root or leaves, not for the fruit
+  const leafVeg = p => p.crop === 'vegetable' && p.fruit !== 'edible';
 
   GP.PLANT_FIELDS = [
     F('name_cs', 0, 'text', 'Český název', 'Czech name', ['cesky nazev', 'cz', 'cs', 'nazev', 'cesky'], { core: true }),
@@ -289,8 +291,9 @@
     pollinators: p => !['cross', 'partial'].includes(p.pollination),
     crop: p => p.purpose === 'ornamental',
     pollination: p => p.purpose === 'ornamental',
-    flowerShowy: p => p.leafType === 'conifer', flowerColors: p => p.leafType === 'conifer',
-    bloomMonths: p => p.leafType === 'conifer', scent: p => p.leafType === 'conifer',
+    // root and leaf vegetables (carrot, radish, lettuce…) are harvested before they flower
+    flowerShowy: p => p.leafType === 'conifer', flowerColors: p => p.leafType === 'conifer' || leafVeg(p),
+    bloomMonths: p => p.leafType === 'conifer' || leafVeg(p), scent: p => p.leafType === 'conifer',
     autumnColors: p => p.foliage === 'evergreen' || p.leafType === 'conifer' || sown(p),
     // annuals and biennials are neither evergreen nor deciduous
     foliage: p => ['annual', 'biennial'].includes(p.type),
