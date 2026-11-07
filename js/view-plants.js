@@ -26,7 +26,11 @@
       if (filt.missing === '_any' && GP.completeness(p) === 100) return false;
       if (filt.missing === '_unsure' && !p.unsure) return false;
       if (filt.missing && filt.missing[0] !== '_' &&GP.isFilled(p, GP.PLANT_FIELDS.find(f => f.key === filt.missing))) return false;
-      if (filt.garden && !GP.state.placements.some(pl => pl.plantId === p.id && pl.gardenId === filt.garden && pl.status !== 'removed')) return false;
+      if (filt.garden) {
+        // '_none' = plants not in any garden yet
+        const inG = GP.state.placements.some(pl => pl.plantId === p.id && pl.status !== 'removed' && (filt.garden === '_none' || pl.gardenId === filt.garden));
+        if (inG === (filt.garden === '_none')) return false;
+      }
       return true;
     });
     const name = (a, b) => GP.plantName(a).localeCompare(GP.plantName(b), 'cs');
@@ -173,7 +177,7 @@
         '<th class="hide-sm">' + sel('crop', opt('', L('Vše', 'All'), filt.crop) + GP.PLANT_OPTS.crop.map(o => opt(o[0], L(o[1], o[2]), filt.crop)).join('') + opt('_none', L('bez užitku', 'none'), filt.crop)) + '</th>' +
         '<th>' + sel('color', opt('', L('Vše', 'All'), filt.color) + GP.PLANT_OPTS.flowerColors.map(o => opt(o[0], L(o[1], o[2]), filt.color)).join('')) + '</th>' +
         ['bloomIn', 'harvestIn'].map(f => '<th class="hide-sm">' + sel(f, opt('', L('Vše', 'All'), filt[f]) + [...Array(12)].map((_, i) => opt(String(i + 1), GP.monthName(i + 1), filt[f])).join('')) + '</th>').join('') +
-        '<th class="hide-sm">' + sel('garden', opt('', L('Vše', 'All'), filt.garden) + GP.state.gardens.map(g => opt(g.id, g.name, filt.garden)).join('')) + '</th>' +
+        '<th class="hide-sm">' + sel('garden', opt('', L('Vše', 'All'), filt.garden) + opt('_none', L('V žádné zahradě', 'In no garden'), filt.garden) + GP.state.gardens.map(g => opt(g.id, g.name, filt.garden)).join('')) + '</th>' +
         '<th>' + sel('missing', opt('', L('Vše', 'All'), filt.missing) + opt('_any', L('Nekompletní', 'Incomplete'), filt.missing) +
           opt('_unsure', L('Neurčené (?)', 'Unidentified (?)') + ' · ' + all.filter(p => p.unsure).length, filt.missing) +
           GP.PLANT_FIELDS.filter(f => f.core).map(f => opt(f.key, L('Chybí: ', 'Missing: ') + GP.fieldLabel(f), filt.missing)).join('')) + '</th></tr>';
