@@ -153,7 +153,8 @@ window.GP = window.GP || {};
     return { state: out, unsure, won };
   }
 
-  // -> { state } | { reachable, error }; reachable = our server answered (even with an error)
+  // -> { state } | { reachable, network, error }; reachable = our server answered (even with an error),
+  // network = no answer at all (server down, Wi-Fi gone) – unlike a plain static server, which answers 404
   async function fetchState() {
     try {
       const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 60000);
@@ -163,7 +164,7 @@ window.GP = window.GP || {};
       if (json) { let e = ''; try { e = (await r.json()).error || ''; } catch (x) { /* ignore */ } return { reachable: true, error: 'HTTP ' + r.status + (e ? ' – ' + e : '') }; }
       return { reachable: false, error: 'HTTP ' + r.status };
     } catch (e) {
-      return { reachable: false, error: e.message };
+      return { reachable: false, network: location.protocol !== 'file:', error: e.message };
     }
   }
 
@@ -337,7 +338,9 @@ window.GP = window.GP || {};
     console.log('GardenPlan start (ms):', JSON.stringify(times));
     if (r.state) return useServerState(r.state, local);
 
-    if (r.reachable || syncInfo.mode === 'server') {
+    // A page that got no answer at all is treated the same: Chrome restoring the page from its cache while the server
+    // was down once showed an empty catalog saved "only in this browser" (a new address had no browser copy yet).
+    if (r.reachable || r.network || syncInfo.mode === 'server') {
       // never fall back to the (possibly empty) browser copy silently – that is how changes got lost
       GP.storageMode = 'server';
       GP.offline = true;
