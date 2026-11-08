@@ -107,7 +107,8 @@
         if (f.type === 'care') {
           // a care column fills the first term: its text, or its months ("– měsíce" column)
           // ("Řez 1" + "Řez 2" -> two terms of Řez)
-          if (sub === 'once') { (once[key] = /^(ano|áno|yes|y|1|x|✓|true|jednorázově|jednorazove)$/i.test(raw)); return; }
+          // one "– jednorázově" column = all terms; repeated columns (text, months, once per term) = term by term
+          if (sub === 'once') { (once[key] = once[key] || []).push(/^(ano|áno|yes|y|1|x|✓|true|jednorázově|jednorazove)$/i.test(raw)); return; }
           const terms = data[key] = data[key] || [];
           if (sub === 'months') {
             const t = terms.find(x => !x.months) || (terms.push({}), terms[terms.length - 1]);
@@ -170,7 +171,10 @@
       // new or changed by the import: flagged until someone ticks "Zkontrolováno" on the plant card
       p.review = true;
       // "– jednorázově" marks every term of that care item, also of a plant that is only being filled in
-      for (const [key, v] of Object.entries(once)) for (const t of GP.careTerms(p, key)) { if (v) t.once = true; else delete t.once; }
+      for (const [key, vs] of Object.entries(once)) GP.careTerms(p, key).forEach((t, i) => {
+        const v = vs.length === 1 ? vs[0] : vs[i];
+        if (v) t.once = true; else if (v === false) delete t.once;
+      });
 
       if (imp.gardenId) {
         const key = p.id + '|' + (place.position || '');
