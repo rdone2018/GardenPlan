@@ -254,7 +254,8 @@
     [L('0 · Základní údaje', '0 · Basic details'), L('Názvy a identita rostliny', 'Names and identity')],
     [L('1 · Vzhled', '1 · Looks'), L('Velikost, list, květ a plod', 'Size, leaves, flower and fruit')],
     [L('2 · Výsadba', '2 · Planting'), L('Co rostlina potřebuje a jak ji sázet', 'What the plant needs and how to plant it')],
-    [L('3 · Péče během roku', '3 · Care through the year'), L('Měsíce u každé péče vytvoří připomínky v kalendáři', 'Months on each care item create calendar reminders')]
+    [L('3 · Péče během roku', '3 · Care through the year'), L('Měsíce u každé péče vytvoří připomínky v kalendáři. Každý úkon zapište jako samostatný termín („+ další termín“) s vlastními měsíci, např. postřik zvlášť a sběr listí zvlášť. Popište péči, jak se správně dělá – co letos dělat nebudete, odškrtnete v kalendáři.',
+      'Months on each care item create calendar reminders. Enter each task as its own term ("+ another time") with its own months, e.g. spraying and raking leaves separately. Describe the care as it should be done – what you skip this year, mark in the calendar.')]
   ];
   GP.fieldLabel = f => L(f.cs, f.en);
   GP.plantField = key => GP.PLANT_FIELDS.find(f => f.key === key);

@@ -66,7 +66,7 @@
             'Done once in any of the chosen months (e.g. painting the trunk). Unticked, the task repeats every month (e.g. spraying).')) + '"><input type="checkbox" data-k="' + path + '.' + i + '.once"' + (t.once ? ' checked' : '') + '> ' +
             esc(L('jednorázově', 'once')) + '</label>' +
           (terms.length > 1 ? '<button type="button" class="link danger small" data-delterm="' + path + '" data-i="' + i + '">✕</button>' : '') + '</div></div>').join('') +
-          '<button type="button" class="link small" data-addterm="' + path + '">+ ' + L('další termín', 'another time') + '</button></div>';
+          '<button type="button" class="link small" data-addterm="' + path + '" title="' + esc(L('Jiný úkon nebo jiná doba = nový termín s vlastními měsíci', 'Another task or time = a new term with its own months')) + '">+ ' + L('další termín', 'another time') + '</button></div>';
       }
       case 'months':
         return '<div class="field wide">' + label + GP.ui.months(path, value) + '</div>';
