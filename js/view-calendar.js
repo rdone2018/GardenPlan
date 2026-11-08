@@ -230,18 +230,19 @@
     const sorted = [...groups.values()].sort((a, b) => order.indexOf(a[0].field) - order.indexOf(b[0].field) || b.length - a.length);
     return '<div class="panel missed" id="missed"><h3>' + ico('⚠️') + L('Nestihnuto – ', 'Missed – ') + esc(GP.monthName(pm)) + ' <span class="muted">(' + list.length + ')</span></h3>' +
       '<p class="small muted">' + L('Jednorázová péče, jejíž období skončilo a není odškrtnutá. Zde ji označte jako udělanou, nebo že se letos dělat nebude.',
-        'One-time care whose months are over and that is not ticked. Mark it done, or that it will not be done this season.') + '</p><ul class="tasks">' +
+        'One-time care whose months are over and that is not ticked. Mark it done, or that it will not be done this season.') + ' ' +
+        L('Rostliny se ukážou po najetí myší na úkol; jednotlivě je najdete v kalendáři daného měsíce.', 'Point at a task to see its plants; one by one they are in the calendar of that month.') + '</p><ul class="tasks">' +
       sorted.map(ts => {
         const t = ts[0], months = ' <span class="muted small">' + esc(GP.formatMonths(t.months || [])) + '</span>';
         // a plant care task is shown like a group of one (instruction first, plant under it)
         if (ts.length === 1 && !t.plant) return '<li><span>' + t.icon + '</span> ' + (t.href ? '<a href="' + t.href + '">' + esc(t.title) + '</a>' : '<b>' + esc(t.title) + '</b>') +
           months + gtag(t) + acts([doneKey(t.key, pm, py)]) + (t.text ? '<div class="small muted pre">' + esc(t.text) + '</div>' : '') + '</li>';
+        // only the instruction and how many plants; the plants show when pointing at it (or tapping it)
         const f = careFields().find(x => x.key === t.field);
         ts.sort((a, b) => name(a).localeCompare(name(b), 'cs'));
-        return '<li class="missed-grp"><span>' + t.icon + '</span> <b>' + esc(f ? GP.fieldLabel(f) : t.title) + '</b> <span class="muted">(' + ts.length + ')</span>' + months +
-          (ts.length > 1 ? acts(ts.map(x => doneKey(x.key, pm, py))) : '') + (t.text ? '<div class="small muted pre grp-note">' + esc(GP.mostUsed(ts.map(x => x.text.trim()))) + '</div>' : '') +
-          '<ul class="tasks">' + ts.map(x => '<li>' + (x.href ? '<a href="' + x.href + '">' + esc(name(x)) + '</a>' : esc(name(x))) + gtag(x) +
-            acts([doneKey(x.key, pm, py)]) + '</li>').join('') + '</ul></li>';
+        return '<li class="missed-grp" tabindex="0"><span>' + t.icon + '</span> <b>' + esc(f ? GP.fieldLabel(f) : t.title) + '</b> <span class="muted">(' + ts.length + ' ' + plantsWord(ts.length) + ')</span>' + months +
+          acts(ts.map(x => doneKey(x.key, pm, py))) + (t.text ? '<div class="small muted pre grp-note">' + esc(GP.mostUsed(ts.map(x => x.text.trim()))) + '</div>' : '') +
+          '<div class="missed-tip">' + ts.map(x => (x.href ? '<a href="' + x.href + '">' + esc(name(x)) + '</a>' : esc(name(x))) + gtag(x)).join('<br>') + '</div></li>';
       }).join('') + '</ul></div>';
   }
 
