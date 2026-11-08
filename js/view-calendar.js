@@ -217,12 +217,13 @@
         'One-time care whose months are over and that is not ticked. Mark it done, or that it will not be done this season.') + '</p><ul class="tasks">' +
       sorted.map(ts => {
         const t = ts[0], months = ' <span class="muted small">' + esc(GP.formatMonths(t.months || [])) + '</span>';
-        if (ts.length === 1) return '<li><span>' + t.icon + '</span> ' + (t.href ? '<a href="' + t.href + '">' + esc(t.title) + '</a>' : '<b>' + esc(t.title) + '</b>') +
+        // a plant care task is shown like a group of one (instruction first, plant under it)
+        if (ts.length === 1 && !t.plant) return '<li><span>' + t.icon + '</span> ' + (t.href ? '<a href="' + t.href + '">' + esc(t.title) + '</a>' : '<b>' + esc(t.title) + '</b>') +
           months + gtag(t) + acts([doneKey(t.key, pm, py)]) + (t.text ? '<div class="small muted pre">' + esc(t.text) + '</div>' : '') + '</li>';
         const f = careFields().find(x => x.key === t.field);
         ts.sort((a, b) => name(a).localeCompare(name(b), 'cs'));
         return '<li class="missed-grp"><span>' + t.icon + '</span> <b>' + esc(f ? GP.fieldLabel(f) : t.title) + '</b> <span class="muted">(' + ts.length + ')</span>' + months +
-          acts(ts.map(x => doneKey(x.key, pm, py))) + (t.text ? '<div class="small muted pre grp-note">' + esc(GP.mostUsed(ts.map(x => x.text.trim()))) + '</div>' : '') +
+          (ts.length > 1 ? acts(ts.map(x => doneKey(x.key, pm, py))) : '') + (t.text ? '<div class="small muted pre grp-note">' + esc(GP.mostUsed(ts.map(x => x.text.trim()))) + '</div>' : '') +
           '<ul class="tasks">' + ts.map(x => '<li>' + (x.href ? '<a href="' + x.href + '">' + esc(name(x)) + '</a>' : esc(name(x))) + gtag(x) +
             acts([doneKey(x.key, pm, py)]) + '</li>').join('') + '</ul></li>';
       }).join('') + '</ul></div>';
@@ -256,13 +257,13 @@
       const name = t => t.plant ? GP.plantName(t.plant) : t.title;
       return [...groups.values()].sort((x, y) => x.order - y.order || x.label.localeCompare(y.label, 'cs')).map(g => {
         g.tasks.sort((x, y) => name(x).localeCompare(name(y), 'cs'));
-        // within the group, plants with the same instruction go together under it (the biggest bunch first);
-        // the plants with an instruction of their own follow, each with its text
+        // within the group, every instruction is written once with its plants under it – the biggest bunch first,
+        // so one plant with an instruction of its own looks the same as a bunch; plants without a text follow
         // texts differing only in case, accents, commas or spaces count as the same; the most used wording is shown
         const byText = new Map();
         for (const t of g.tasks) { const k = GP.textKey(t.text); if (!byText.has(k)) byText.set(k, []); byText.get(k).push(t); }
-        const shared = [...byText].filter(([k, ts]) => k && ts.length > 1).sort((x, y) => y[1].length - x[1].length);
-        const single = g.tasks.filter(t => !shared.some(([k]) => k === GP.textKey(t.text)));
+        const shared = [...byText].filter(([k]) => k).sort((x, y) => y[1].length - x[1].length);
+        const single = g.tasks.filter(t => !GP.textKey(t.text));
         const wording = ts => GP.mostUsed(ts.map(t => t.text.trim()));
         return '<div class="care-grp">' + (g.label ? '<div class="grp-h">' + esc(g.label) + ' <span class="muted">(' + g.tasks.length + ')</span></div>' : '') +
           shared.map(([, ts]) => '<div class="grp-same"><div class="small muted pre grp-note">' + esc(wording(ts)) + '</div><ul class="tasks">' + ts.map(t => li(t, name(t), true)).join('') + '</ul></div>').join('') +
