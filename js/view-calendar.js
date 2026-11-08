@@ -104,9 +104,18 @@
     if (!t.once) return '';
     const d = doneIn(t, m);
     return ' <span class="once-tag" title="' + esc(L('Jednorázová péče – stačí jednou v kterémkoli z jejích měsíců', 'One-time care – once in any of its months')) + '">1×' +
-      (skipped(t, m) ? ' · ' + L('nebude se dělat', 'will not be done') : d && d !== m ? ' · ' + L('hotovo: ', 'done: ') + esc(GP.monthName(d)) : '') + '</span>';
+      (!skipped(t, m) && d && d !== m ? ' · ' + L('hotovo: ', 'done: ') + esc(GP.monthName(d)) : '') + '</span>';
   };
   const doneCls = (t, m) => (skipped(t, m) ? 'done skipped' : doneIn(t, m) ? 'done' : '');
+  // "will not be done" for tasks ts in month m (one task, or a whole group); a second click takes it back.
+  // data-skip = the keys to mark, data-undo = every key that may hold the mark (one-time care: the whole run)
+  const skipBtn = (ts, m, all) => {
+    const on = ts.every(t => skipped(t, m));
+    if (!on && ts.every(t => doneIn(t, m))) return '';
+    return ' <button type="button" class="link small skip-btn' + (on ? ' on' : '') + '" data-skip="' + esc(ts.map(t => doneKey(t.key, m)).join(' ')) + '" data-undo="' +
+      esc(ts.flatMap(t => doneKeys(t, m)).join(' ')) + '"' + (on ? ' data-on' : '') + '>' +
+      (on ? L('nebude se dělat · ↺ vrátit', 'will not be done · ↺ undo') : '✕ ' + (all ? L('nic z toho se nebude dělat', 'none of it will be done') : L('nebude se dělat', 'will not be done'))) + '</button>';
+  };
 
   GP.agendaHtml = function (m, gardenId, compact) {
     const a = GP.monthAgenda(m, gardenId);
@@ -135,6 +144,13 @@
       GP.save();
     });
     root.addEventListener('click', e => {
+      const s = e.target.closest('[data-skip]');
+      if (s) {
+        if (s.hasAttribute('data-on')) for (const k of s.dataset.undo.split(' ')) { if (GP.state.taskDone[k] === 'skip') delete GP.state.taskDone[k]; }
+        else for (const k of s.dataset.skip.split(' ')) GP.state.taskDone[k] = 'skip';
+        GP.save(); GP.render();
+        return;
+      }
       const d = e.target.closest('[data-deltask]');
       if (!d || !confirm(L('Smazat tento úkol?', 'Delete this task?'))) return;
       GP.state.tasks = GP.state.tasks.filter(t => t.id !== d.dataset.deltask);
@@ -235,7 +251,7 @@
     const li = (t, label, noText) => {
       return '<li class="' + doneCls(t, m) + '"><label>' + doneBox(t, m) + ' ' +
         (t.href ? '<a href="' + t.href + '">' + esc(label) + '</a>' : '<b>' + esc(label) + '</b>') + '</label>' + onceNote(t, m) +
-        (showGarden && t.garden ? ' <span class="tag">' + esc(t.garden.name) + '</span>' : '') +
+        (showGarden && t.garden ? ' <span class="tag">' + esc(t.garden.name) + '</span>' : '') + skipBtn([t], m) +
         (t.custom ? ' <button class="link danger small" data-deltask="' + t.custom.id + '">✕</button>' : '') +
         (t.text && !noText ? '<div class="small muted pre">' + esc(t.text) + '</div>' : '') + '</li>';
     };
@@ -266,7 +282,7 @@
         const single = g.tasks.filter(t => !GP.textKey(t.text));
         const wording = ts => GP.mostUsed(ts.map(t => t.text.trim()));
         return '<div class="care-grp">' + (g.label ? '<div class="grp-h">' + esc(g.label) + ' <span class="muted">(' + g.tasks.length + ')</span></div>' : '') +
-          shared.map(([, ts]) => '<div class="grp-same"><div class="small muted pre grp-note">' + esc(wording(ts)) + '</div><ul class="tasks">' + ts.map(t => li(t, name(t), true)).join('') + '</ul></div>').join('') +
+          shared.map(([, ts]) => '<div class="grp-same"><div class="small muted pre grp-note">' + esc(wording(ts)) + (ts.length > 1 ? skipBtn(ts, m, true) : '') + '</div><ul class="tasks">' + ts.map(t => li(t, name(t), true)).join('') + '</ul></div>').join('') +
           (single.length ? '<ul class="tasks">' + single.map(t => li(t, name(t))).join('') + '</ul>' : '') + '</div>';
       }).join('');
     };

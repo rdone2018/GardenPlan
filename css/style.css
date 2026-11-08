@@ -477,3 +477,8 @@ input.num { width: 4.5rem; }
 .month-h { display: flex; align-items: center; flex-wrap: wrap; gap: .2rem .4rem; margin: 1.6rem 0 .8rem; padding: .5rem .2rem; border-top: 2px solid var(--green); border-bottom: 1px solid var(--line); color: var(--green); font-size: 1.35rem; }
 .month-h .muted { font-weight: 400; }
 .tasks li.skipped > label { text-decoration-style: dashed; }
+.skip-btn { color: var(--muted, #888); margin-left: .4rem; text-decoration: none; font-size: .75rem; }
+.skip-btn:hover { color: #a5531f; }
+.skip-btn.on { color: #a5531f; }
+.grp-same > .grp-note { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+.grp-note .skip-btn { flex-shrink: 0; white-space: nowrap; }
