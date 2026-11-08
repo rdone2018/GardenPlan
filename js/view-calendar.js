@@ -7,6 +7,22 @@
   const taskFields = () => GP.PLANT_FIELDS.filter(f => f.task);
   const taskShown = (p, f) => !f.show || f.show(p);
 
+  // Every tree and shrub needs watering in dry spells for a few years after planting: one general reminder,
+  // instead of a "young trees…" text on each plant. Unknown planting year = still shown, with a hint.
+  const YOUNG = { years: 3, months: [5, 6, 7, 8], types: ['tree', 'shrub'] };
+  // -> '' (not young) | 'young' | 'unknown' (no planting year on the placement)
+  GP.youngState = function (p, pl) {
+    if (!p || !YOUNG.types.includes(p.type)) return '';
+    const [y, mo] = String(pl.plantedDate || '').split('-').map(Number);
+    if (!y) return 'unknown';
+    const now = new Date(), age = (now.getFullYear() - y) * 12 + (mo ? now.getMonth() + 1 - mo : 0);
+    return age < YOUNG.years * 12 ? 'young' : '';
+  };
+  const youngText = st => L('Nově vysazený strom či keř (do ' + YOUNG.years + ' let po výsadbě): v suchu vydatně zalévat ke kořenům, 10–20 l jednou týdně.',
+    'Newly planted tree or shrub (up to ' + YOUNG.years + ' years after planting): water deeply at the roots in dry spells, 10–20 l once a week.') +
+    (st === 'unknown' ? '\n' + L('Rok výsadby není vyplněný – doplňte ho v zahradě (seznam rostlin) a po ' + YOUNG.years + ' letech se připomínka přestane ukazovat.',
+      'The planting year is not filled in – add it in the garden (plant list) and the reminder stops after ' + YOUNG.years + ' years.') : '');
+
   // Care of what grows in the garden in month `m` (optionally for one garden): only plants planted out –
   // sowing and planting are in the planting plan (plantingPage), which works with the whole catalog.
   GP.monthAgenda = function (m, gardenId) {
@@ -27,6 +43,16 @@
           tasks.push({ key, kind: 'care', field: f.key, plant: p, icon: f.icon || '•', title: GP.fieldLabel(f) + ' – ' + GP.plantName(p), text: c.text, garden: g, href: '#/plant/' + p.id,
             once: !!c.once, months: c.months });
         });
+      }
+      const young = GP.youngState(p, pl), wf = careFields().find(f => f.key === 'watering');
+      // only for plants without watering of their own (raspberries, blueberries… have it all their life)
+      if (young && wf && YOUNG.months.includes(m) && !GP.careTerms(p, 'watering').some(t => (t.months || []).length)) {
+        const key = 'young:' + g.id + ':' + p.id;
+        if (!seen.has(key)) {
+          seen.add(key);
+          tasks.push({ key, kind: 'care', field: 'watering', plant: p, icon: wf.icon || '•', title: GP.fieldLabel(wf) + ' – ' + GP.plantName(p), text: youngText(young), garden: g,
+            href: '#/plant/' + p.id, once: false, months: YOUNG.months });
+        }
       }
     }
     for (const e of GP.state.equipment) {
@@ -260,8 +286,11 @@
   // Whole-year table of planted plants; mode: 'year' = care, 'bloom' = flowering, 'harvest' = ripening
   function yearView(gardenId, mode) {
     const pls = GP.state.placements.filter(pl => pl.status === 'planted' && (!gardenId || pl.gardenId === gardenId));
+    // a young tree or shrub has the general watering reminder on top of its own care
+    const young = p => !GP.careTerms(p, 'watering').some(t => (t.months || []).length) && pls.some(pl => pl.plantId === p.id && GP.youngState(p, pl));
+    const careIn = (p, f, m) => GP.careTerms(p, f.key).some(t => (t.months || []).includes(m)) || (f.key === 'watering' && YOUNG.months.includes(m) && young(p));
     const monthsOf = p => mode === 'bloom' ? p.bloomMonths || [] : mode === 'harvest' ? p.harvestMonths || []
-      : careFields().flatMap(f => GP.careTerms(p, f.key).flatMap(t => t.months || []));
+      : careFields().flatMap(f => GP.careTerms(p, f.key).flatMap(t => t.months || [])).concat(young(p) ? YOUNG.months : []);
     // flowering and ripening have the Type · Purpose · Crop columns with filters
     const typed = mode === 'bloom' || mode === 'harvest';
     const all = [...new Set(pls.map(pl => pl.plantId))].map(id => GP.byId('plants', id)).filter(p => p && monthsOf(p).length);
@@ -282,7 +311,7 @@
       html += '<tr><td class="nm"><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a></td>' + (typed ? typeCells(p) : '');
       for (let m = 1; m <= 12; m++) {
         const cell = mode === 'bloom' ? (ms.includes(m) ? flower(hex) : '') : mode === 'harvest' ? (ms.includes(m) ? '🍎' : '')
-          : '<span class="ci">' + careFields().filter(f => GP.careTerms(p, f.key).some(t => (t.months || []).includes(m))).map(f => f.icon).join('') + '</span>';
+          : '<span class="ci">' + careFields().filter(f => careIn(p, f, m)).map(f => f.icon).join('') + '</span>';
         html += '<td class="' + (m === now ? 'now' : '') + '" title="' + esc(GP.monthName(m)) + '">' + cell + '</td>';
       }
       html += '</tr>';
@@ -404,7 +433,8 @@
         '<label class="field wide"><span class="lbl">' + L('Poznámka', 'Note') + '</span><input type="text" data-t="note"></label>' +
         '<div class="field wide"><span class="lbl">' + L('Měsíce', 'Months') + '</span>' + GP.ui.months('months', [cal.month]) + '</div></div>' +
         '<button class="btn primary" data-act="addtask">' + L('Přidat úkol', 'Add task') + '</button></div>' +
-        '<p class="muted small">' + L('Připomínky vznikají z měsíců u péče o rostliny (karta rostliny → 2 · Péče), z úkolů techniky a z vlastních úkolů. Odškrtnutí platí pro letošní rok.', 'Reminders come from care months on plants (plant card → 2 · Care), technology tasks and custom tasks. Ticks apply to the current year.') + '</p>';
+        '<p class="muted small">' + L('Připomínky vznikají z měsíců u péče o rostliny (karta rostliny → 2 · Péče), z úkolů techniky a z vlastních úkolů. Stromy a keře bez vlastní zálivky mají zálivku V–VIII po dobu ' + YOUNG.years + ' let od výsadby (bez vyplněného roku výsadby pořád). Odškrtnutí platí pro letošní rok.',
+          'Reminders come from care months on plants (plant card → 2 · Care), technology tasks and custom tasks. Trees and shrubs without watering of their own get watering V–VIII for ' + YOUNG.years + ' years after planting (always, when the planting year is missing). Ticks apply to the current year.') + '</p>';
       return html;
     },
     mount(root) {
