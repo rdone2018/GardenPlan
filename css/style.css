@@ -420,6 +420,13 @@ input.num { width: 4.5rem; }
 .grp-note { margin: 0 0 .2rem; padding: .2rem .5rem; background: #f7f6f1; border-left: 3px solid #d9e6cf; border-radius: 0 4px 4px 0; }
 .care-grp .tasks { margin-top: .1rem; }
 .grp-same + .grp-same, .grp-same + .tasks { margin-top: .4rem; }
+/* calendar care: one framed box per instruction, its plants in two columns */
+.care-blk .grp-same { border: 1px solid #dfe6d6; border-radius: 6px; overflow: hidden; }
+.care-blk .grp-same > .grp-note { margin: 0; padding: .35rem .6rem; border-left: 0; border-radius: 0; background: #eef4e8; color: var(--text, #333); border-bottom: 1px solid #dfe6d6; }
+.care-blk .grp-same > .tasks { margin: 0; padding: 0 .6rem; }
+.tasks.cols2 { columns: 2; column-gap: 1.4rem; }
+.tasks.cols2 li { break-inside: avoid; }
+.care-blk .grp-h { margin: .3rem 0 .3rem; }
 /* one-time care: done once in any of its months */
 .ct-cluster h3 .small { font-weight: normal; margin-left: .3rem; }
 .ct-var { display: grid; grid-template-columns: auto auto 1fr; gap: .5rem; align-items: start; padding: .45rem 0; border-top: 1px solid var(--line); }
@@ -451,11 +458,8 @@ input.num { width: 4.5rem; }
 .sum-lbl { display: flex; align-items: center; font-size: .9rem; }
 .sum-lbl .ico { width: 1.6rem; font-size: 1.25rem; margin-right: .3rem; }
 .sum-rows { gap: .3rem; }
-.care-blk.split .blk-cols { columns: 2; column-gap: 1.2rem; }
-.care-blk.split .grp-h, .care-blk.split .grp-same, .care-blk.split .tasks li { break-inside: avoid; }
-.care-blk.split .grp-h { break-after: avoid; }
 .blk-none { margin: 0 0 .4rem; }
-@media (max-width: 640px) { .cal-2, .care-grid { grid-template-columns: 1fr; } .care-blk.split .blk-cols { columns: 1; } }
+@media (max-width: 640px) { .cal-2, .care-grid { grid-template-columns: 1fr; } .tasks.cols2 { columns: 1; } }
 /* previous · selected · next month: the selected one stands out, the other two are grey and smaller */
 .cal-3 { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 0 .8rem; align-items: start; }
 .cal-3 .sum-row { grid-template-columns: minmax(7rem, 11rem) 1fr; gap: .5rem; }

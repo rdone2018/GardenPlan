@@ -282,41 +282,23 @@
         const single = g.tasks.filter(t => !GP.textKey(t.text));
         const wording = ts => GP.mostUsed(ts.map(t => t.text.trim()));
         return '<div class="care-grp">' + (g.label ? '<div class="grp-h">' + esc(g.label) + ' <span class="muted">(' + g.tasks.length + ')</span></div>' : '') +
-          shared.map(([, ts]) => '<div class="grp-same"><div class="small muted pre grp-note">' + esc(wording(ts)) + (ts.length > 1 ? skipBtn(ts, m, true) : '') + '</div><ul class="tasks">' + ts.map(t => li(t, name(t), true)).join('') + '</ul></div>').join('') +
-          (single.length ? '<ul class="tasks">' + single.map(t => li(t, name(t))).join('') + '</ul>' : '') + '</div>';
+          // each instruction is a framed box: the text on top, its plants in two columns under it
+          shared.map(([, ts]) => '<div class="grp-same"><div class="small pre grp-note">' + esc(wording(ts)) + (ts.length > 1 ? skipBtn(ts, m, true) : '') + '</div><ul class="tasks cols2">' + ts.map(t => li(t, name(t), true)).join('') + '</ul></div>').join('') +
+          (single.length ? '<ul class="tasks cols2">' + single.map(t => li(t, name(t))).join('') + '</ul>' : '') + '</div>';
       }).join('');
     };
     const plantLinks = (list, swatch) => list.length ? '<div class="pchips">' + list.map(p => '<a class="pchip" href="#/plant/' + p.id + '">' + (swatch ? GP.ui.swatch(GP.colorHex(p)) + ' ' : '') + esc(GP.plantName(p)) + '</a>').join('') + '</div>' : '';
     const sec = (icon, title, n, body, cls) => '<div class="panel cal-sec' + (cls ? ' ' + cls : '') + '"><h3>' + ico(icon) + title + ' <span class="muted">(' + n + ')</span></h3>' +
       (body || '<p class="muted small">' + L('Nic', 'Nothing') + '</p>') + '</div>';
-    // one block per kind of work ("✂️ Řez / střih (4)"), each line = the plant
-    // mode: '' in a column, 'wide' across the page, 'split' across the page with its groups in two columns
-    const block = (k, mode) => {
-      const ts = a.tasks.filter(k.is), body = taskList(ts);
-      return '<div class="care-blk' + (mode ? ' wide' : '') + (mode === 'split' ? ' split' : '') + '" data-o="' + main.indexOf(k) + '"><h4>' + ico(k.icon) + esc(k.label) + ' <span class="muted">(' + ts.length + ')</span></h4>' +
-        (mode === 'split' ? '<div class="blk-cols">' + body + '</div>' : body) + '</div>';
+    // Kind of work (💧 Zálivka) → type of plant (Strom · ovoce) → one framed box per instruction with its plants
+    // in two columns. Kinds with nothing to do this month are only named on one line.
+    const block = k => {
+      const ts = a.tasks.filter(k.is);
+      return '<div class="care-blk"><h4>' + ico(k.icon) + esc(k.label) + ' <span class="muted">(' + ts.length + ')</span></h4>' + taskList(ts) + '</div>';
     };
-    // The main kinds of work fill two columns, each block going to the shorter one (in the usual order), so the
-    // columns stay even whatever the month brings. A block bigger than all the others together (winter care in
-    // December) goes across the page with its groups in two columns. Kinds with nothing to do are only named.
-    const kinds = workKinds(), byId = id => kinds.find(k => k.id === id);
-    const main = ['watering', 'fertilizing', 'pruning', 'winter', 'diseases', 'pests'].map(byId).filter(Boolean);
-    const has = k => a.tasks.some(k.is);
-    const rest = kinds.filter(k => !main.includes(k) && has(k));
-    const empty = main.concat(kinds.filter(k => k.id === 'otherCare')).filter(k => !has(k));
-    // rough height of a block: its lines (plants), instructions and heading
-    const size = k => { const ts = a.tasks.filter(k.is); return ts.length + new Set(ts.map(t => GP.textKey(t.text))).size + 3; };
-    const used = main.filter(has), total = used.reduce((s, k) => s + size(k), 0);
-    const big = used.length > 1 ? used.find(k => size(k) > total - size(k)) : used[0];
-    const cols = [[], []], hgt = [0, 0];
-    for (const k of used) {
-      if (k === big) continue;
-      const i = hgt[0] <= hgt[1] ? 0 : 1;
-      cols[i].push(k); hgt[i] += size(k);
-    }
-    const careHtml = (big ? block(big, 'split') : '') +
-      (cols[0].length ? '<div class="care-grid"><div class="care-col">' + cols[0].map(k => block(k)).join('') + '</div><div class="care-col">' + cols[1].map(k => block(k)).join('') + '</div></div>' : '') +
-      rest.map(k => block(k, 'wide')).join('') +
+    const kinds = workKinds(), has = k => a.tasks.some(k.is);
+    const empty = kinds.filter(k => k.id !== 'eq' && k.id !== 'task' && !has(k));
+    const careHtml = kinds.filter(has).map(block).join('') +
       (empty.length ? '<p class="muted small blk-none">' + L('Tento měsíc není: ', 'Nothing this month: ') + empty.map(k => k.icon + ' ' + esc(k.label)).join(' · ') + '</p>' : '');
     const p = GP.monthAgenda(prevMonth(m), gardenId), miss = missed(m, gardenId);
     return overview(m, a, b, p, miss.length) + missedPanel(m, miss) +
@@ -326,22 +308,6 @@
       sec('🌸', L('Kvetení', 'Flowering'), a.bloom.length, plantLinks(a.bloom, true)) +
       sec('🍎', L('Zrání a sklizeň', 'Ripening and harvest'), a.harvest.length, plantLinks(a.harvest)) + '</div>' +
       sec('🧰', L('Péče', 'Care'), a.tasks.length, careHtml) + '</div>';
-  }
-
-  // The size guess in monthPage cannot know how the texts wrap: once on the page, the blocks are split between
-  // the two columns again by their real heights – of all the ways (at most 6 blocks = 64), the one with the
-  // shorter longer column; each column keeps the usual order.
-  function balanceCare(root) {
-    const cols = [...root.querySelectorAll('.care-grid > .care-col')];
-    if (cols.length !== 2 || getComputedStyle(cols[0].parentNode).gridTemplateColumns.split(' ').length < 2) return;
-    const blocks = cols.flatMap(c => [...c.children]).sort((x, y) => x.dataset.o - y.dataset.o);
-    const h = blocks.map(b => b.getBoundingClientRect().height);
-    let best = 0, bestMax = Infinity;
-    for (let mask = 0; mask < 1 << blocks.length; mask += 2) {   // the first block always stays left
-      const right = h.reduce((s, x, i) => s + (mask >> i & 1 ? x : 0), 0), left = h.reduce((s, x) => s + x, 0) - right;
-      if (Math.max(left, right) < bestMax - 1) { bestMax = Math.max(left, right); best = mask; }
-    }
-    blocks.forEach((b, i) => cols[best >> i & 1].appendChild(b));
   }
 
   // a small flower in the colour of the plant's flowers (an emoji cannot be recoloured)
@@ -540,7 +506,6 @@
       });
       const agenda = root.querySelector('#agenda');
       if (!agenda) return;
-      balanceCare(agenda);
       GP.bindAgenda(agenda);
       // a tick changes the "done" part of the overview bars
       if (cal.view === 'month') agenda.addEventListener('change', e => { if (e.target.dataset.done) GP.render(); });
