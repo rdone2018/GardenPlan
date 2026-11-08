@@ -470,6 +470,9 @@ input.num { width: 4.5rem; }
 .panel.missed { border-left: 4px solid var(--warn); background: #fffaf0; }
 .panel.missed h3 { display: flex; align-items: center; margin-top: 0; }
 .missed-act { display: inline-flex; gap: .3rem; margin-left: .5rem; vertical-align: middle; }
+.missed-grp .grp-note { margin: .25rem 0; }
+.missed-grp > .tasks { margin: 0 0 0 1.6rem; }
+.missed-grp > .tasks li { padding: .15rem 0; }
 /* everything below the heading is about the selected month */
 .month-h { display: flex; align-items: center; flex-wrap: wrap; gap: .2rem .4rem; margin: 1.6rem 0 .8rem; padding: .5rem .2rem; border-top: 2px solid var(--green); border-bottom: 1px solid var(--line); color: var(--green); font-size: 1.35rem; }
 .month-h .muted { font-weight: 400; }

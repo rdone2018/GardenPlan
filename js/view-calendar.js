@@ -194,22 +194,37 @@
     return '<div class="cal-3">' + box(pm, py, p, 'pv') + box(m, 0, a, '') + box(nextMonth(m), 0, b, 'nx') + '</div>';
   }
 
-  // Missed one-time care: tick it as done after all, or mark that it will not be done this season.
+  // Missed one-time care: tick it as done after all, or mark that it will not be done this season. The same task
+  // (kind of work, wording and months) of several plants is listed once, with buttons for all of them.
   function missedPanel(m, list) {
     if (!list.length) return '';
     const [pm, py] = before(m);
     const showGarden = GP.state.gardens.length > 1;
+    const acts = keys => '<span class="missed-act"><button class="btn small" data-missed="' + esc(keys.join(' ')) + '" data-v="1">✓ ' + L('udělané', 'done') + '</button>' +
+      '<button class="btn small" data-missed="' + esc(keys.join(' ')) + '" data-v="skip">✕ ' + L('nebude se dělat', 'will not be done') + '</button></span>';
+    const gtag = t => (showGarden && t.garden ? ' <span class="tag">' + esc(t.garden.name) + '</span>' : '');
+    const name = t => t.plant ? GP.plantName(t.plant) : t.title;
+    const order = careFields().map(f => f.key);
+    const groups = new Map();
+    for (const t of list) {
+      const k = (t.field || t.kind) + '|' + GP.textKey(t.text) + '|' + (t.months || []).join(',');
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(t);
+    }
+    const sorted = [...groups.values()].sort((a, b) => order.indexOf(a[0].field) - order.indexOf(b[0].field) || b.length - a.length);
     return '<div class="panel missed" id="missed"><h3>' + ico('⚠️') + L('Nestihnuto – ', 'Missed – ') + esc(GP.monthName(pm)) + ' <span class="muted">(' + list.length + ')</span></h3>' +
       '<p class="small muted">' + L('Jednorázová péče, jejíž období skončilo a není odškrtnutá. Zde ji označte jako udělanou, nebo že se letos dělat nebude.',
         'One-time care whose months are over and that is not ticked. Mark it done, or that it will not be done this season.') + '</p><ul class="tasks">' +
-      list.map(t => {
-        const key = doneKey(t.key, pm, py);
-        return '<li><span>' + t.icon + '</span> ' + (t.href ? '<a href="' + t.href + '">' + esc(t.title) + '</a>' : '<b>' + esc(t.title) + '</b>') +
-          ' <span class="muted small">' + esc(GP.formatMonths(t.months || [])) + '</span>' +
-          (showGarden && t.garden ? ' <span class="tag">' + esc(t.garden.name) + '</span>' : '') +
-          '<span class="missed-act"><button class="btn small" data-missed="' + esc(key) + '" data-v="1">✓ ' + L('udělané', 'done') + '</button>' +
-          '<button class="btn small" data-missed="' + esc(key) + '" data-v="skip">✕ ' + L('nebude se dělat', 'will not be done') + '</button></span>' +
-          (t.text ? '<div class="small muted pre">' + esc(t.text) + '</div>' : '') + '</li>';
+      sorted.map(ts => {
+        const t = ts[0], months = ' <span class="muted small">' + esc(GP.formatMonths(t.months || [])) + '</span>';
+        if (ts.length === 1) return '<li><span>' + t.icon + '</span> ' + (t.href ? '<a href="' + t.href + '">' + esc(t.title) + '</a>' : '<b>' + esc(t.title) + '</b>') +
+          months + gtag(t) + acts([doneKey(t.key, pm, py)]) + (t.text ? '<div class="small muted pre">' + esc(t.text) + '</div>' : '') + '</li>';
+        const f = careFields().find(x => x.key === t.field);
+        ts.sort((a, b) => name(a).localeCompare(name(b), 'cs'));
+        return '<li class="missed-grp"><span>' + t.icon + '</span> <b>' + esc(f ? GP.fieldLabel(f) : t.title) + '</b> <span class="muted">(' + ts.length + ')</span>' + months +
+          acts(ts.map(x => doneKey(x.key, pm, py))) + (t.text ? '<div class="small muted pre grp-note">' + esc(GP.mostUsed(ts.map(x => x.text.trim()))) + '</div>' : '') +
+          '<ul class="tasks">' + ts.map(x => '<li>' + (x.href ? '<a href="' + x.href + '">' + esc(name(x)) + '</a>' : esc(name(x))) + gtag(x) +
+            acts([doneKey(x.key, pm, py)]) + '</li>').join('') + '</ul></li>';
       }).join('') + '</ul></div>';
   }
 
@@ -469,7 +484,7 @@
       const gm = root.querySelector('[data-gomissed]');
       if (gm) gm.onclick = () => root.querySelector('#missed').scrollIntoView({ behavior: 'smooth', block: 'start' });
       root.querySelectorAll('[data-missed]').forEach(b => b.onclick = () => {
-        GP.state.taskDone[b.dataset.missed] = b.dataset.v === 'skip' ? 'skip' : true;
+        for (const k of b.dataset.missed.split(' ')) GP.state.taskDone[k] = b.dataset.v === 'skip' ? 'skip' : true;
         GP.save(); GP.render();
         GP.ui.toast(b.dataset.v === 'skip' ? L('Označeno: nebude se dělat', 'Marked: will not be done') : L('Označeno jako udělané', 'Marked as done'));
       });
