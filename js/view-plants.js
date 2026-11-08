@@ -77,15 +77,28 @@
     const form = root.querySelector('#pform');
     if (!form) return;
     form.querySelectorAll('.missing').forEach(el => el.classList.remove('missing'));
-    form.querySelectorAll('.miss-n').forEach(el => el.remove());
+    form.querySelectorAll('.miss-n, .na-btn').forEach(el => el.remove());
+    form.querySelectorAll('.na').forEach(el => el.classList.remove('na'));
     const sections = form.querySelectorAll('details.group');
     const count = new Map();
+    const boxOf = f => {
+      const el = form.querySelector('[data-care="' + f.key + '"], [data-multi="' + f.key + '"], [data-months="' + f.key + '"], [data-k="' + f.key + '"]');
+      return el && (el.closest('details.care-item') || el.closest('.field'));
+    };
+    // a missing field can be marked "nehodí se" (does not apply to this plant), so it is not counted as missing
+    const naBtn = (f, on) => '<button type="button" class="link small na-btn' + (on ? ' on' : '') + '" data-na="' + f.key + '" title="' +
+      (on ? L('Pole se u této rostliny nevyplňuje – kliknutím zrušit', 'Not used for this plant – click to undo') : L('Pole se u této rostliny nevyplňuje (např. kapradina nekvete) – nepočítat jako chybějící', 'Does not apply to this plant – do not count as missing')) + '">' +
+      (on ? '✓ ' + L('nehodí se', 'not applicable') + ' · ↺' : L('nehodí se', 'not applicable')) + '</button>';
+    for (const key of p.na || []) {
+      const f = GP.PLANT_FIELDS.find(x => x.key === key), box = f && boxOf(f);
+      if (box) { box.classList.add('na'); box.insertAdjacentHTML('beforeend', naBtn(f, true)); }
+    }
     for (const f of GP.countedFields(p)) {
       if (GP.isFilled(p, f)) continue;
-      const el = form.querySelector('[data-care="' + f.key + '"], [data-multi="' + f.key + '"], [data-months="' + f.key + '"], [data-k="' + f.key + '"]');
-      const box = el && (el.closest('details.care-item') || el.closest('.field'));
+      const box = boxOf(f);
       if (!box) continue;
       box.classList.add('missing');
+      if (f.type !== 'care' && !/^name_/.test(f.key)) box.insertAdjacentHTML('beforeend', naBtn(f, false));
       const sec = box.closest('details.group');
       count.set(sec, (count.get(sec) || 0) + 1);
     }
@@ -307,7 +320,7 @@
           L('Až druh zjistíte, doplňte latinský název a zrušte zaškrtnutí.', 'Once you know the species, fill in the Latin name and untick this.') + '</p>' +
           '<label class="field wide"><span class="lbl">' + L('Co o ní víme (vzhled, výška, kdy kvete, odkud je)', 'What we know (looks, height, flowering, where from)') + '</span>' +
           '<textarea data-k="idNote" rows="2">' + esc(p.idNote || '') + '</textarea></label>' : '') + '</div>';
-      const missing = GP.coreFields(p).filter(f => !GP.isFilled(p, f)).map(GP.fieldLabel);
+      const missing = GP.coreFields(p).filter(f => !GP.isFilled(p, f) && !(p.na || []).includes(f.key)).map(GP.fieldLabel);
       // Lines in the notes starting with "!!!" are shown as a warning at the top.
       const important = (p.notes || '').split('\n').filter(x => /^\s*!!!/.test(x)).map(x => x.replace(/^\s*!!!\s*/, ''));
       let html = '<div class="head"><h1><a href="#/plants" class="back">←</a> <span id="pname">' + esc(GP.plantName(p)) + '</span></h1>' +
@@ -363,6 +376,17 @@
         if (add) { if (!terms.length) terms.push({}); terms.push({}); } else terms.splice(+del.dataset.i, 1);
         p[key] = terms;
         GP.save(); careRedraw(); markMissing(root, p);
+      });
+      form.addEventListener('click', e => {
+        const b = e.target.closest('[data-na]');
+        if (!b) return;
+        e.preventDefault();
+        const na = new Set(p.na || []);
+        if (na.has(b.dataset.na)) na.delete(b.dataset.na); else na.add(b.dataset.na);
+        if (na.size) p.na = [...na]; else delete p.na;
+        GP.save();
+        root.querySelector('#pbar').innerHTML = GP.ui.bar(GP.completeness(p));
+        markMissing(root, p);
       });
       root.querySelector('[data-act=unsure]').onchange = e => {
         if (e.target.checked) p.unsure = true; else delete p.unsure;

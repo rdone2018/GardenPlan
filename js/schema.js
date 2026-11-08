@@ -312,6 +312,8 @@
     if (f.show && !f.show(plant)) return false;
     const nn = NOT_NEEDED[f.key];
     if (nn === true || (typeof nn === 'function' && nn(plant))) return false;
+    // marked on the card as "does not apply to this plant" (ferns do not flower, sterile cultivars are not sown…)
+    if ((plant.na || []).includes(f.key)) return false;
     return f.type !== 'care' || GP.careExpected(plant, f);
   });
   // Per section: { pct, missing: [labels] }; care is unknown (pct null) until "Needs maintenance" is ticked.
