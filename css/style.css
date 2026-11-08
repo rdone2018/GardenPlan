@@ -451,9 +451,11 @@ input.num { width: 4.5rem; }
 .sum-lbl { display: flex; align-items: center; font-size: .9rem; }
 .sum-lbl .ico { width: 1.6rem; font-size: 1.25rem; margin-right: .3rem; }
 .sum-rows { gap: .3rem; }
-.care-blk.blk-empty { opacity: .6; }
-.care-blk.blk-empty p { margin: 0; }
-@media (max-width: 640px) { .cal-2, .care-grid { grid-template-columns: 1fr; } }
+.care-blk.split .blk-cols { columns: 2; column-gap: 1.2rem; }
+.care-blk.split .grp-h, .care-blk.split .grp-same, .care-blk.split .tasks li { break-inside: avoid; }
+.care-blk.split .grp-h { break-after: avoid; }
+.blk-none { margin: 0 0 .4rem; }
+@media (max-width: 640px) { .cal-2, .care-grid { grid-template-columns: 1fr; } .care-blk.split .blk-cols { columns: 1; } }
 /* previous · selected · next month: the selected one stands out, the other two are grey and smaller */
 .cal-3 { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 0 .8rem; align-items: start; }
 .cal-3 .sum-row { grid-template-columns: minmax(7rem, 11rem) 1fr; gap: .5rem; }
