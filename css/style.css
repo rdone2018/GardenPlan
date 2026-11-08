@@ -459,6 +459,9 @@ input.num { width: 4.5rem; }
 .sum-lbl .ico { width: 1.6rem; font-size: 1.25rem; margin-right: .3rem; }
 .sum-rows { gap: .3rem; }
 .blk-none { margin: 0 0 .4rem; }
+/* plants flagged by an import until checked */
+.review-box { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin: .4rem 0; padding: .45rem .7rem; background: #eef3fb; border-left: 4px solid #6f95c9; border-radius: 0 6px 6px 0; }
+.review-tag { cursor: help; }
 @media (max-width: 640px) { .cal-2, .care-grid { grid-template-columns: 1fr; } .tasks.cols2 { columns: 1; } }
 /* previous · selected · next month: the selected one stands out, the other two are grey and smaller */
 .cal-3 { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 0 .8rem; align-items: start; }

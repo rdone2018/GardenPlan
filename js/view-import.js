@@ -167,6 +167,8 @@
         res.created++;
       }
       thisRun.add(p.id);
+      // new or changed by the import: flagged until someone ticks "Zkontrolováno" on the plant card
+      p.review = true;
       // "– jednorázově" marks every term of that care item, also of a plant that is only being filled in
       for (const [key, v] of Object.entries(once)) for (const t of GP.careTerms(p, key)) { if (v) t.once = true; else delete t.once; }
 

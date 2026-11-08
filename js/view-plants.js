@@ -25,6 +25,7 @@
       if (filt.harvestIn && !(p.harvestMonths || []).includes(+filt.harvestIn)) return false;
       if (filt.missing === '_any' && GP.completeness(p) === 100) return false;
       if (filt.missing === '_unsure' && !p.unsure) return false;
+      if (filt.missing === '_review' && !p.review) return false;
       if (filt.missing && filt.missing[0] !== '_' &&GP.isFilled(p, GP.PLANT_FIELDS.find(f => f.key === filt.missing))) return false;
       if (filt.garden) {
         // '_none' = plants not in any garden yet
@@ -180,6 +181,7 @@
         '<th class="hide-sm">' + sel('garden', opt('', L('Vše', 'All'), filt.garden) + opt('_none', L('V žádné zahradě', 'In no garden'), filt.garden) + GP.state.gardens.map(g => opt(g.id, g.name, filt.garden)).join('')) + '</th>' +
         '<th>' + sel('missing', opt('', L('Vše', 'All'), filt.missing) + opt('_any', L('Nekompletní', 'Incomplete'), filt.missing) +
           opt('_unsure', L('Neurčené (?)', 'Unidentified (?)') + ' · ' + all.filter(p => p.unsure).length, filt.missing) +
+          opt('_review', '🔍 ' + L('Ke kontrole', 'To review') + ' · ' + all.filter(p => p.review).length, filt.missing) +
           GP.PLANT_FIELDS.filter(f => f.core).map(f => opt(f.key, L('Chybí: ', 'Missing: ') + GP.fieldLabel(f), filt.missing)).join('')) + '</th></tr>';
       const anyFilter = FILTERS.some(k => filt[k]);
       for (const id of picked) if (!GP.byId('plants', id)) picked.delete(id);
@@ -198,7 +200,7 @@
         return [...by].map(([gid, n]) => { const g = GP.byId('gardens', gid); return g ? esc(g.name) + (n > 1 ? ' <span class="muted">(' + n + ' ' + L('ks', 'pcs') + ')</span>' : '') : ''; }).filter(Boolean).join(', ');
       };
       const rows = list.map(p => '<tr data-href="#/plant/' + p.id + '"' + (picked.has(p.id) ? ' class="row-picked"' : '') + '><td class="pick"><input type="checkbox" data-pick="' + p.id + '"' + (picked.has(p.id) ? ' checked' : '') + '></td><td class="thumb">' + (p.photo ? '<img src="' + p.photo + '" alt="" loading="lazy">' : '') + '</td>' +
-          '<td><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a><div class="italic small muted">' + esc(p.name_la) + '</div></td>' +
+          '<td><a href="#/plant/' + p.id + '">' + esc(GP.plantName(p)) + '</a>' + (p.review ? ' <span class="review-tag" title="' + L('Ke kontrole (z importu)', 'To review (imported)') + '">🔍</span>' : '') + '<div class="italic small muted">' + esc(p.name_la) + '</div></td>' +
           '<td class="hide-sm">' + esc(GP.typeLabel(p.type)) + '</td>' +
           '<td class="hide-sm small">' + esc(GP.optLabel(GP.PLANT_OPTS.purpose, p.purpose)) + '</td>' +
           '<td class="hide-sm small">' + esc(GP.optLabel(GP.PLANT_OPTS.crop, p.crop)) + '</td>' +
@@ -319,6 +321,8 @@
         (p.photo && p.photoCredit ? '<div class="credit">' + (p.photoPage ? '<a target="_blank" rel="noopener" href="' + esc(p.photoPage) + '">' + esc(p.photoCredit) + '</a>' : esc(p.photoCredit)) + '</div>' : '') + '</div>' +
         '<div class="grow"><p class="names"><b>CZ</b> ' + esc(p.name_cs || '—') + ' · <b>SK</b> ' + esc(p.name_sk || '—') + ' · <b>EN</b> ' + esc(p.name_en || '—') + ' · <b>LA</b> <i>' + esc(p.name_la || '—') + '</i></p>' +
         important.map(x => '<div class="alert">⚠ ' + esc(x) + '</div>').join('') +
+        (p.review ? '<div class="review-box">🔍 ' + L('Nová nebo doplněná z importu – zkontrolujte údaje a péči.', 'New or filled in by an import – check the details and care.') +
+          ' <button class="btn small primary" data-act="reviewed">✓ ' + L('Zkontrolováno', 'Checked') + '</button></div>' : '') +
         (missing.length ? '<p class="small muted">' + L('Chybí doplnit', 'Still missing') + ': ' + esc(missing.join(', ')) + '</p>' : '<p class="small ok-text">✓ ' + L('Hlavní údaje jsou kompletní', 'Main details are complete') + '</p>') +
         (p.unsure ? '' : web) + unsure + '</div></div><div id="pform">';
       groups.forEach((g, gi) => {
@@ -363,6 +367,12 @@
       root.querySelector('[data-act=unsure]').onchange = e => {
         if (e.target.checked) p.unsure = true; else delete p.unsure;
         GP.saveNow(); GP.render();
+      };
+      const rv = root.querySelector('[data-act=reviewed]');
+      if (rv) rv.onclick = () => {
+        delete p.review;
+        GP.saveNow(); GP.render();
+        GP.ui.toast(L('Označeno jako zkontrolované ✓', 'Marked as checked ✓'));
       };
       const idn = root.querySelector('[data-k=idNote]');
       if (idn) idn.oninput = () => { p.idNote = idn.value; GP.save(); };
