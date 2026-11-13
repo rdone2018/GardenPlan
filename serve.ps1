@@ -25,7 +25,8 @@ try {
       $ext = [IO.Path]::GetExtension($file).ToLower()
       $ctx.Response.ContentType = if ($types[$ext]) { $types[$ext] } else { 'application/octet-stream' }
       $ctx.Response.Headers.Add('Cache-Control', 'no-cache')
-      $ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length)
+      # a HEAD request (or a closed tab) must not stop the server
+      try { $ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length) } catch { }
     } else {
       $ctx.Response.StatusCode = 404
     }

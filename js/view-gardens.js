@@ -539,7 +539,9 @@
     const byCell = placementsByCell(g);
     const modeBtn = (m, icon, cs, en) => '<button class="seg' + (ui.mode === m ? ' on' : '') + '" data-mode="' + m + '">' + icon + ' ' + L(cs, en) + '</button>';
     let tools = '<div class="toolbar">' + modeBtn('plants', '🌱', 'Rostliny', 'Plants') + modeBtn('zones', '🎨', 'Zóny', 'Zones') + modeBtn('season', '🌸', 'Sezóna', 'Season') +
-      '<span class="grow"></span><button class="seg" data-zoom="-1" title="' + L('Oddálit', 'Zoom out') + '">−</button><button class="seg" data-zoom="1" title="' + L('Přiblížit', 'Zoom in') + '">+</button></div>';
+      '<span class="grow"></span><span class="muted small zoom-hint">' + L('Ctrl + kolečko / dva prsty', 'Ctrl + wheel / two fingers') + '</span>' +
+      '<button class="seg" data-zoom="-1" title="' + L('Oddálit', 'Zoom out') + '">−</button><button class="seg" data-zoom="0" title="' + L('Celý plán', 'Whole plan') + '">⤢</button>' +
+      '<button class="seg" data-zoom="1" title="' + L('Přiblížit', 'Zoom in') + '">+</button></div>';
     if (ui.mode === 'season') {
       tools += '<div class="toolbar season-bar"><button class="seg" data-act="play">' + (ui.playing ? '⏸' : '▶') + '</button>' +
         '<input type="range" min="1" max="12" value="' + ui.month + '" data-act="month"><b class="month-name">' + esc(GP.monthName(ui.month)) + '</b></div>';
@@ -570,6 +572,7 @@
           content = '<i class="dot" style="background:' + (hex || '#6a9c55') + '"></i><span class="lab">' + esc(abbr(GP.plantName(p))) + (pls.length > 1 ? '<sup>+' + (pls.length - 1) + '</sup>' : '') + '</span>';
           if (pls.some(pl => GP.plantIssues(GP.byId('plants', pl.plantId), g, key, byCell).length)) content += '<i class="warn-dot">!</i>';
           if (pls.some(pl => pl.status === 'wish' || pl.status === 'planned')) cls += ' planned';
+          cls += ' has-pl';
         }
       }
       if (ui.cell === key) cls += ' sel';
@@ -660,10 +663,28 @@
   let playTimer = null;
   function mountPlan(root, g) {
     const wrap = root.querySelector('#gridWrap'), grid = root.querySelector('#grid');
-    const fit = () => Math.max(16, Math.min(56, Math.floor((wrap.clientWidth - 4) / g.grid.cols)));
-    grid.style.setProperty('--cell', (ui.zoom || fit()) + 'px');
+    // whole width visible by default; a big fine grid (180 × 80 at 0.5 m) then gets tiny cells, zoom in to work
+    const fit = () => Math.max(3, Math.min(56, (wrap.clientWidth - 4) / g.grid.cols));
+    const cur = () => ui.zoom || fit();
+    const applyZoom = z => {
+      grid.style.setProperty('--cell', z + 'px');
+      grid.classList.toggle('tiny', z < 14);   // labels would not fit
+      grid.classList.toggle('micro', z < 7);   // grid lines would hide the plan
+    };
+    // zoom without re-rendering (thousands of cells), keeping the point under (cx, cy) in place
+    const setZoom = (z, cx, cy) => {
+      const old = cur();
+      z = Math.max(3, Math.min(96, z));
+      if (cx == null) { cx = wrap.clientWidth / 2; cy = wrap.clientHeight / 2; }
+      const gx = (wrap.scrollLeft + cx) / old, gy = (wrap.scrollTop + cy) / old;
+      ui.zoom = z;
+      applyZoom(z);
+      wrap.scrollLeft = gx * z - cx; wrap.scrollTop = gy * z - cy;
+    };
+    applyZoom(cur());
     if (ui.scroll && ui.scroll.id === g.id) { wrap.scrollLeft = ui.scroll.x; wrap.scrollTop = ui.scroll.y; }
     const rerender = () => { ui.scroll = { id: g.id, x: wrap.scrollLeft, y: wrap.scrollTop }; GP.render(); };
+    let pinching = false;
 
     root.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
       ui.mode = b.dataset.mode; ui.move = null;
@@ -671,10 +692,32 @@
       stopPlay(); rerender();
     });
     root.querySelectorAll('[data-zoom]').forEach(b => b.onclick = () => {
-      const cur = ui.zoom || fit();
-      ui.zoom = Math.max(12, Math.min(96, Math.round(cur * (b.dataset.zoom === '1' ? 1.25 : 0.8))));
-      rerender();
+      if (b.dataset.zoom === '0') { ui.zoom = null; applyZoom(fit()); wrap.scrollLeft = 0; wrap.scrollTop = 0; return; }
+      setZoom(cur() * (b.dataset.zoom === '1' ? 1.5 : 1 / 1.5));
     });
+    // Ctrl + wheel (a touchpad pinch arrives the same way)
+    wrap.addEventListener('wheel', e => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const r = wrap.getBoundingClientRect();
+      setZoom(cur() * Math.exp(-e.deltaY * 0.003), e.clientX - r.left, e.clientY - r.top);
+    }, { passive: false });
+    // two-finger pinch on a phone / tablet
+    let pinch = null;
+    const span = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    wrap.addEventListener('touchstart', e => {
+      if (e.touches.length !== 2) return;
+      pinching = true;
+      pinch = { d: span(e.touches), z: cur() };
+    }, { passive: true });
+    wrap.addEventListener('touchmove', e => {
+      if (!pinch || e.touches.length !== 2) return;
+      e.preventDefault();
+      const r = wrap.getBoundingClientRect();
+      setZoom(pinch.z * span(e.touches) / pinch.d,
+        (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left, (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top);
+    }, { passive: false });
+    wrap.addEventListener('touchend', e => { if (e.touches.length < 2) pinch = null; if (!e.touches.length) pinching = false; });
 
     if (ui.mode === 'season') {
       const m = root.querySelector('[data-act=month]');
@@ -696,7 +739,7 @@
       let painting = false;
       const paint = el => {
         const cellEl = el && el.closest && el.closest('[data-cell]');
-        if (!cellEl || ui.zoneSel == null) return;
+        if (!cellEl || ui.zoneSel == null || pinching) return;
         const key = cellEl.dataset.cell, z = g.zones.find(x => x.id === ui.zoneSel);
         const c = g.cells[key] || {};
         if (z) c.zone = z.id; else delete c.zone;
