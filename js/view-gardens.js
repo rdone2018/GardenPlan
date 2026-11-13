@@ -415,11 +415,37 @@
         sel(GP.CELL_LIGHT, z.light, 'light') + '</td><td>' + sel(GP.CELL_WATER, z.water, 'water') + '</td><td><button class="link danger" data-act="delzone">✕</button></td></tr>').join('') +
       '</tbody></table><button class="btn" data-act="addzone">+ ' + L('Přidat zónu', 'Add zone') + '</button></div>';
   }
+  // A new cell size keeps the plan the same size in metres: more (or fewer) cells, and painted zones and placed
+  // plants move to the cells covering the same spot (changing only the size used to shrink the drawing into a corner).
+  function rescaleGrid(g, cellM) {
+    const old = g.grid.cellM || 1;
+    if (cellM === old) return;
+    const cols = Math.min(200, Math.max(2, Math.round(g.grid.cols * old / cellM)));
+    const rows = Math.min(200, Math.max(2, Math.round(g.grid.rows * old / cellM)));
+    const from = n => Math.floor((n + 0.5) * cellM / old); // old cell under the centre of new cell n
+    const cells = {}, moved = new Map();
+    for (let c = 0; c < cols; c++) {
+      for (let r = 0; r < rows; r++) {
+        const key = c + ',' + r, src = from(c) + ',' + from(r);
+        if (g.cells[src]) cells[key] = JSON.parse(JSON.stringify(g.cells[src]));
+        if (!moved.has(src)) moved.set(src, []);
+        moved.get(src).push(key);
+      }
+    }
+    g.cells = cells;
+    for (const pl of GP.gardenPlacements(g.id)) {
+      if (pl.cells && pl.cells.length) pl.cells = [...new Set(pl.cells.flatMap(k => moved.get(k) || []))];
+    }
+    g.grid = { cols, rows, cellM };
+    GP.ui.toast(L('Mřížka plánu', 'Plan grid') + ': ' + cols + ' × ' + rows + ' (' + cellM + ' m)');
+  }
+
   function mountZones(root, g) {
     root.querySelectorAll('[data-grid]').forEach(inp => inp.onchange = () => {
       const k = inp.dataset.grid, v = parseFloat(inp.value);
       if (!(v > 0)) return;
-      g.grid[k] = k === 'cellM' ? v : Math.min(200, Math.max(2, Math.round(v)));
+      if (k === 'cellM') rescaleGrid(g, v);
+      else g.grid[k] = Math.min(200, Math.max(2, Math.round(v)));
       GP.saveNow(); GP.render();
     });
     root.querySelector('[data-act=bg]').onchange = async e => {
