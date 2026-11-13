@@ -170,8 +170,8 @@ details.group:not([open]) > summary h2::before { content: "▸ "; }
 .axis span { position: absolute; white-space: nowrap; line-height: 1; }
 .axis-y { position: sticky; left: 0; border-right: 1px solid var(--line); }
 .axis-y span { right: 4px; transform: translateY(-50%); }
-.axis-y span:first-child { transform: none; }
-.axis-y span:last-child { transform: translateY(-100%); }
+.axis-y span:first-child { transform: translateY(-100%); }
+.axis-y span:last-child { transform: none; }
 .axis-x { position: sticky; bottom: 0; height: 18px; border-top: 1px solid var(--line); }
 .axis-x span { top: 3px; transform: translateX(-50%); }
 .axis-x span:first-child { transform: none; }

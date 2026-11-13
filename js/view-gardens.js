@@ -578,7 +578,7 @@
       if (ui.cell === key) cls += ' sel';
       if (ui.move && ui.move.from === key) cls += ' moving';
       if (every5((c + 1) * g.grid.cellM)) cls += ' m5x';
-      if (every5((r + 1) * g.grid.cellM)) cls += ' m5y';
+      if (every5((rows - 1 - r) * g.grid.cellM) && r < rows - 1) cls += ' m5y'; // y counts from the bottom edge
       const title = GP.cellName(key) + (ci.zone ? ' · ' + ci.zone.name : '') + pls.map(pl => '\n• ' + GP.plantName(GP.byId('plants', pl.plantId))).join('');
       cells += '<div class="' + cls + '" data-cell="' + key + '" style="' + style + '" title="' + esc(title) + '">' + content + '</div>';
     }
@@ -675,12 +675,14 @@
     const canvas = root.querySelector('#planCanvas'), axisX = root.querySelector('#axisX'), axisY = root.querySelector('#axisY');
     const fit = () => Math.max(3, Math.min(56, (wrap.clientWidth - 4 - axisY.offsetWidth) / g.grid.cols));
     const cur = () => ui.zoom || fit();
-    // ruler numbers every 5 m, or 10 / 20 / 50 m when zoomed out so they do not overlap
+    // ruler numbers every 5 m, or 10 / 20 / 50 m when zoomed out so they do not overlap;
+    // like in maths both axes start at 0 in the bottom-left corner
     const drawAxes = z => {
       const pxM = z / g.grid.cellM, step = [5, 10, 20, 50].find(s => s * pxM >= 30) || 100;
-      const marks = (len, pos) => { let h = ''; for (let m = 0; m <= len + 1e-6; m += step) h += '<span style="' + pos + ':' + (m * pxM) + 'px">' + m + '</span>'; return h; };
-      axisX.innerHTML = marks(g.grid.cols * g.grid.cellM, 'left');
-      axisY.innerHTML = marks(g.grid.rows * g.grid.cellM, 'top');
+      const marks = (len, at) => { let h = ''; for (let m = 0; m <= len + 1e-6; m += step) h += '<span style="' + at(m) + 'px">' + m + '</span>'; return h; };
+      const w = g.grid.cols * g.grid.cellM, h = g.grid.rows * g.grid.cellM;
+      axisX.innerHTML = marks(w, m => 'left:' + m * pxM);
+      axisY.innerHTML = marks(h, m => 'top:' + (h - m) * pxM);
     };
     const applyZoom = z => {
       canvas.style.setProperty('--cell', z + 'px');
