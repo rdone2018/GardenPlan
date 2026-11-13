@@ -161,6 +161,22 @@ details.group:not([open]) > summary h2::before { content: "▸ "; }
 .grid.tiny .cell .lab, .grid.tiny .cell .dot, .grid.tiny .cell .warn-dot, .grid.tiny .cell .fruit { display: none; }
 .grid.tiny .cell.has-pl { box-shadow: inset 0 0 0 100px rgba(79,125,69,.85); }
 .grid.micro .cell { border: 0; }
+/* a stronger line every 5 m */
+.grid .cell.m5x, .grid.micro .cell.m5x { border-right: 1px solid rgba(0,0,0,.35); }
+.grid .cell.m5y, .grid.micro .cell.m5y { border-bottom: 1px solid rgba(0,0,0,.35); }
+/* rulers in metres */
+.plan-canvas { display: grid; grid-template-columns: 30px max-content; width: max-content; }
+.axis { position: relative; font-size: 11px; color: var(--muted, #666); background: #fff; z-index: 4; }
+.axis span { position: absolute; white-space: nowrap; line-height: 1; }
+.axis-y { position: sticky; left: 0; border-right: 1px solid var(--line); }
+.axis-y span { right: 4px; transform: translateY(-50%); }
+.axis-y span:first-child { transform: none; }
+.axis-y span:last-child { transform: translateY(-100%); }
+.axis-x { position: sticky; bottom: 0; height: 18px; border-top: 1px solid var(--line); }
+.axis-x span { top: 3px; transform: translateX(-50%); }
+.axis-x span:first-child { transform: none; }
+.axis-x span:last-child { transform: translateX(-100%); }
+.axis-corner { position: sticky; left: 0; bottom: 0; z-index: 5; background: #fff; font-size: 11px; color: var(--muted, #666); text-align: right; padding: 3px 4px 0 0; }
 .grid.micro .cell:hover { outline-width: 1px; outline-offset: 0; }
 .zoom-hint { margin-right: .4rem; }
 @media (max-width: 700px) { .zoom-hint { display: none; } }

@@ -577,14 +577,22 @@
       }
       if (ui.cell === key) cls += ' sel';
       if (ui.move && ui.move.from === key) cls += ' moving';
+      if (every5((c + 1) * g.grid.cellM)) cls += ' m5x';
+      if (every5((r + 1) * g.grid.cellM)) cls += ' m5y';
       const title = GP.cellName(key) + (ci.zone ? ' · ' + ci.zone.name : '') + pls.map(pl => '\n• ' + GP.plantName(GP.byId('plants', pl.plantId))).join('');
       cells += '<div class="' + cls + '" data-cell="' + key + '" style="' + style + '" title="' + esc(title) + '">' + content + '</div>';
     }
     const bg = g.background ? 'background-image:url(' + g.background + ');' : '';
-    const grid = '<div class="grid-wrap" id="gridWrap"><div class="grid ' + ui.mode + '" id="grid" style="--cols:' + cols + ';--rows:' + rows + ';' + bg + '--op:' + (g.background ? (g.bgOpacity == null ? 0.55 : g.bgOpacity) : 1) + '">' + cells + '</div></div>';
+    // rulers in metres: left (y) and below (x), they stay in view while scrolling; labels are drawn in mountPlan
+    const grid = '<div class="grid-wrap" id="gridWrap"><div class="plan-canvas" id="planCanvas">' +
+      '<div class="axis axis-y" id="axisY"></div>' +
+      '<div class="grid ' + ui.mode + '" id="grid" style="--cols:' + cols + ';--rows:' + rows + ';' + bg + '--op:' + (g.background ? (g.bgOpacity == null ? 0.55 : g.bgOpacity) : 1) + '">' + cells + '</div>' +
+      '<div class="axis-corner">m</div><div class="axis axis-x" id="axisX"></div></div></div>';
     const scale = '<p class="muted small">' + L('1 políčko', '1 cell') + ' = ' + g.grid.cellM + ' × ' + g.grid.cellM + ' m · ' + cols + ' × ' + rows + '</p>';
     return tools + '<div class="plan"><aside class="side">' + sidePanel(g, byCell) + '</aside><div class="plan-main">' + grid + scale + '</div></div>';
   }
+
+  const every5 = m => Math.abs(m / 5 - Math.round(m / 5)) < 1e-6;
 
   const abbr = name => (name.replace(/['‘’"]/g, '').trim().split(/\s+/)[0] || '?').slice(0, 3);
 
@@ -664,22 +672,31 @@
   function mountPlan(root, g) {
     const wrap = root.querySelector('#gridWrap'), grid = root.querySelector('#grid');
     // whole width visible by default; a big fine grid (180 × 80 at 0.5 m) then gets tiny cells, zoom in to work
-    const fit = () => Math.max(3, Math.min(56, (wrap.clientWidth - 4) / g.grid.cols));
+    const canvas = root.querySelector('#planCanvas'), axisX = root.querySelector('#axisX'), axisY = root.querySelector('#axisY');
+    const fit = () => Math.max(3, Math.min(56, (wrap.clientWidth - 4 - axisY.offsetWidth) / g.grid.cols));
     const cur = () => ui.zoom || fit();
+    // ruler numbers every 5 m, or 10 / 20 / 50 m when zoomed out so they do not overlap
+    const drawAxes = z => {
+      const pxM = z / g.grid.cellM, step = [5, 10, 20, 50].find(s => s * pxM >= 30) || 100;
+      const marks = (len, pos) => { let h = ''; for (let m = 0; m <= len + 1e-6; m += step) h += '<span style="' + pos + ':' + (m * pxM) + 'px">' + m + '</span>'; return h; };
+      axisX.innerHTML = marks(g.grid.cols * g.grid.cellM, 'left');
+      axisY.innerHTML = marks(g.grid.rows * g.grid.cellM, 'top');
+    };
     const applyZoom = z => {
-      grid.style.setProperty('--cell', z + 'px');
+      canvas.style.setProperty('--cell', z + 'px');
       grid.classList.toggle('tiny', z < 14);   // labels would not fit
       grid.classList.toggle('micro', z < 7);   // grid lines would hide the plan
+      drawAxes(z);
     };
     // zoom without re-rendering (thousands of cells), keeping the point under (cx, cy) in place
     const setZoom = (z, cx, cy) => {
       const old = cur();
       z = Math.max(3, Math.min(96, z));
       if (cx == null) { cx = wrap.clientWidth / 2; cy = wrap.clientHeight / 2; }
-      const gx = (wrap.scrollLeft + cx) / old, gy = (wrap.scrollTop + cy) / old;
+      const ax = axisY.offsetWidth, gx = (wrap.scrollLeft + cx - ax) / old, gy = (wrap.scrollTop + cy) / old;
       ui.zoom = z;
       applyZoom(z);
-      wrap.scrollLeft = gx * z - cx; wrap.scrollTop = gy * z - cy;
+      wrap.scrollLeft = gx * z - cx + ax; wrap.scrollTop = gy * z - cy;
     };
     applyZoom(cur());
     if (ui.scroll && ui.scroll.id === g.id) { wrap.scrollLeft = ui.scroll.x; wrap.scrollTop = ui.scroll.y; }
