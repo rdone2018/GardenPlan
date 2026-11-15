@@ -118,7 +118,7 @@
       tab = tab || defaultTab(g);
       const tabs = '<div class="tabs">' + TABS.map(([t, i, cs, en]) => '<a href="#/garden/' + g.id + '/' + t + '" class="' + (t === tab ? 'on' : '') + '">' + i + ' ' + L(cs, en) + '</a>').join('') + '</div>';
       const body = tab === 'info' ? infoTab(g) : tab === 'zones' ? zonesTab(g) : tab === 'list' ? listTab(g) : planTab(g);
-      return '<div class="head"><h1><a href="#/gardens" class="back">←</a> ' + esc(g.name) + '</h1></div>' + tabs + body;
+      return '<div class="head"><h1><a href="#/gardens" class="back">←</a> ' + esc(g.name) + '</h1><a class="btn" href="#/booklet/' + g.id + '" title="' + L('Diář zahrady k tisku nebo uložení do PDF', 'A printable garden diary, also as PDF') + '">📖 ' + L('Booklet zahrady', 'Garden booklet') + '</a></div>' + tabs + body;
     },
     mount(root, [id, tab]) {
       const g = GP.byId('gardens', id);

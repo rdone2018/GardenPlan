@@ -11,7 +11,7 @@
     ['data', '💾', 'Data', 'Data']
   ];
   const ROUTES = { '': 'dashboard', gardens: 'gardens', garden: 'garden', plants: 'plants', plant: 'plant',
-    import: 'import', calendar: 'calendar', tech: 'tech', equipment: 'equipment', data: 'data', caretexts: 'caretexts', profile: 'profile', welcome: 'welcome' };
+    import: 'import', calendar: 'calendar', tech: 'tech', equipment: 'equipment', data: 'data', caretexts: 'caretexts', profile: 'profile', welcome: 'welcome', booklet: 'booklet' };
 
   function route() {
     const parts = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);

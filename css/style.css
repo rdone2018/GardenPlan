@@ -717,3 +717,73 @@ body.signed-out .nav, body.signed-out #lang, body.signed-out .saved { display: n
 .welcome-number { width: 2.4rem; height: 2.4rem; border-radius: 50%; display: grid; place-items: center; background: var(--green); color: #fff; font-weight: 700; }
 .welcome-end { max-width: 720px; margin: 1rem auto; display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; }
 @media (max-width: 600px) { .welcome-step { grid-template-columns: 2.4rem 1fr; } .welcome-step .btn { grid-column: 2; justify-self: start; } }
+
+/* garden booklet (js/view-booklet.js): A4 sheets on screen, real pages in print */
+.booklet { --bk-ink: #22301f; font-size: 10pt; color: var(--bk-ink); }
+.bk-page { background: #fff; width: 210mm; max-width: 100%; min-height: 297mm; margin: 0 auto 1.2rem; padding: 14mm 14mm 12mm; box-shadow: 0 2px 14px rgba(0,0,0,.12); }
+.bk-page h1 { font-size: 26pt; margin: .1em 0; color: #1f3d1c; }
+.bk-page h2 { font-size: 17pt; margin: 0 0 .6em; padding-bottom: .2em; border-bottom: 2px solid var(--green); color: #1f3d1c; }
+.bk-page h2 span { font-size: 11pt; color: var(--muted); font-weight: 400; }
+.bk-page h3 { font-size: 12.5pt; margin: 1em 0 .4em; color: #1f3d1c; }
+.bk-page h4 { font-size: 10.5pt; margin: .8em 0 .3em; color: var(--green); }
+.bk-eyebrow { margin: 0; font-size: 9pt; letter-spacing: .14em; text-transform: uppercase; color: var(--green-2); font-weight: 700; }
+.bk-sub { margin: 0 0 1em; color: var(--muted); }
+.bk-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+.bk-kv { width: 100%; border-collapse: collapse; }
+.bk-kv th { text-align: left; font-weight: 600; color: var(--muted); padding: 1.2mm 2mm 1.2mm 0; width: 45%; vertical-align: top; }
+.bk-kv td { padding: 1.2mm 0; border-bottom: 1px solid #eee; }
+.bk-stats { display: flex; flex-wrap: wrap; gap: 3mm; margin: 6mm 0 2mm; }
+.bk-stats div { border: 1px solid #e3e8dc; border-radius: 3mm; padding: 2mm 4mm; background: #f6faf2; }
+.bk-stats b { display: block; font-size: 15pt; color: var(--green); }
+.bk-zones { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 1.5mm 5mm; }
+.bk-zones i { display: inline-block; width: 4mm; height: 4mm; border-radius: 1mm; margin-right: 1.5mm; vertical-align: -.6mm; border: 1px solid rgba(0,0,0,.15); }
+.bk-zones span { color: var(--muted); }
+.bk-toc { columns: 2; margin: 0; }
+.bk-canvas { width: 100%; height: auto; border-radius: 2mm; display: block; margin-bottom: 3mm; }
+.bk-note, .bk-ref { color: var(--muted); font-size: 9pt; }
+.bk-genus { break-inside: avoid-page; margin-bottom: 7mm; }
+.bk-genus h3 { border-left: 4px solid var(--green); padding-left: 2.5mm; }
+.bk-genus h3 span { font-size: 9.5pt; font-weight: 400; color: var(--muted); }
+.bk-members { width: 100%; border-collapse: collapse; font-size: 9pt; }
+.bk-members th { text-align: left; font-size: 8pt; color: var(--muted); border-bottom: 1px solid #ddd; padding: 1mm; }
+.bk-members td { border-bottom: 1px solid #eee; padding: 1.2mm 1mm; vertical-align: top; }
+.bk-thumb { width: 14mm; }
+.bk-th img { width: 13mm; height: 13mm; object-fit: cover; border-radius: 1.5mm; display: block; }
+.bk-th figcaption { display: none; }
+.bk-th, .bk-ph { margin: 0; }
+.bk-facts { color: #45503f; font-size: 8.8pt; margin: .5mm 0 1.5mm; }
+.bk-care { width: 100%; border-collapse: collapse; font-size: 8.8pt; }
+.bk-care td { padding: .6mm 1mm; vertical-align: top; }
+.bk-care-h td { padding-top: 1.6mm; font-weight: 700; color: #33402e; }
+.bk-m { width: 24mm; white-space: nowrap; color: var(--green); font-weight: 600; }
+.bk-once { font-size: 7.5pt; background: #fff4dc; color: #8a5a00; border-radius: 2mm; padding: 0 1.2mm; font-weight: 700; }
+.bk-notes { color: var(--muted); font-style: italic; font-size: 8.5pt; margin: 1mm 0 0; }
+.bk-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+.bk-card { break-inside: avoid; border: 1px solid #e3e8dc; border-radius: 3mm; padding: 3mm; display: grid; grid-template-columns: auto 1fr; gap: 3mm; align-content: start; }
+.bk-card h4 { margin: 0; color: #1f3d1c; font-size: 10.5pt; }
+.bk-count { color: var(--muted); font-weight: 400; font-size: 9pt; }
+.bk-la { margin: .3mm 0 1mm; font-style: italic; color: var(--muted); font-size: 8.5pt; }
+.bk-ph img { width: 22mm; height: 22mm; object-fit: cover; border-radius: 2mm; display: block; }
+.bk-ph figcaption { font-size: 6pt; color: var(--muted); max-width: 22mm; line-height: 1.2; margin-top: .5mm; }
+.bk-card-body { min-width: 0; }
+.bk-month { break-inside: avoid; margin-bottom: 6mm; }
+.bk-month h3 { text-transform: capitalize; background: var(--green-soft); padding: 1.5mm 3mm; border-radius: 2mm; margin-top: 0; }
+.bk-tasks { list-style: none; padding: 0; margin: 0; display: grid; gap: 1.6mm; }
+.bk-tasks li { display: grid; grid-template-columns: 6mm 1fr; font-size: 9pt; }
+.bk-pl { color: #45503f; font-size: 8.5pt; margin: .3mm 0; }
+
+@page { size: A4; margin: 0; }
+@media print {
+  .topbar, .no-print, .page > .alert, .toast { display: none !important; }
+  html, body, .app, .page { background: #fff !important; margin: 0 !important; padding: 0 !important; max-width: none !important; }
+  .bk-page { box-shadow: none; margin: 0; width: 210mm; min-height: 0; break-after: page; }
+  .bk-page:last-child { break-after: auto; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+.bk-mark { display: inline-block; min-width: 4mm; font-weight: 700; color: var(--green); }
+.bk-without td { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(0,0,0,.25); }
+.bk-without .bk-mark { color: #a8661a; text-decoration: none; }
+/* the plan page is printed on its own A4 page in landscape, so a wide garden fills it */
+.bk-page.bk-plan { width: 297mm; min-height: 210mm; }
+@page plan { size: A4 landscape; margin: 0; }
+@media print { .bk-page.bk-plan { page: plan; width: 297mm; } }
