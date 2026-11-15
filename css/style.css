@@ -618,6 +618,62 @@ body.signed-out .nav, body.signed-out #lang, body.signed-out .saved { display: n
 .intro .on .cal-col.prev li { animation: rise .4s calc(var(--d) * 350ms + .5s) both; }
 .intro .on .cal-col.now li { animation: rise .4s calc(var(--d) * 450ms + 2s) both; }
 
+/* fill from databases: search, the species found, the proposed fields */
+.intro .look-ex { position: absolute; left: 7%; right: 7%; top: 31%; bottom: 12%; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto 1fr; gap: 3% 4%; font-size: clamp(.55rem, 1.9cqw, .9rem); }
+.intro .look-search { grid-column: 1 / -1; display: flex; align-items: center; gap: .6em; background: #fff; border: 1px solid var(--line); border-radius: 99px; padding: .45em .9em; }
+.intro .look-search em { margin-left: auto; font-style: normal; background: var(--green); color: #fff; border-radius: 99px; padding: .2em .8em; }
+.intro .typing { display: inline-block; overflow: hidden; white-space: nowrap; width: 0; flex-shrink: 0; border-right: 2px solid var(--green); }
+.intro .on .typing { animation: typein 1s steps(7) .6s both; }
+@keyframes typein { from { width: 0; } to { width: 4.5em; } }
+.intro .look-pick { background: var(--green-soft); border-radius: 8px; padding: .5em .8em; align-self: start; }
+.intro .look-pick span { color: var(--muted); }
+.intro .look-rows { grid-row: 2 / 4; grid-column: 2; margin: 0; padding: 0; list-style: none; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: .5em .8em; display: grid; gap: .3em; align-content: start; }
+.intro .look-rows li { display: grid; grid-template-columns: 1.4em 5.5em 1fr; }
+.intro .look-rows li > span { color: var(--green); }
+.intro .look-rows b { color: var(--muted); font-weight: 600; }
+.intro .look-more { grid-column: 1; align-self: end; color: var(--muted); }
+.intro .look-search, .intro .look-pick, .intro .look-rows li, .intro .look-more { opacity: 0; }
+.intro .on .look-search { animation: rise .4s .2s both; }
+.intro .on .look-pick { animation: pop .5s 1.9s both; }
+.intro .on .look-rows li { animation: rise .4s calc((var(--d) - 2) * 380ms + 2.6s) both; }
+.intro .on .look-more { animation: rise .4s 5.2s both; }
+
+/* what is missing: red rows filled one by one, the bar grows to 100 % */
+.intro .miss-ex { position: absolute; left: 7%; right: 7%; top: 31%; bottom: 12%; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 2.5% 3%; font-size: clamp(.55rem, 1.9cqw, .9rem); display: flex; flex-direction: column; gap: .5em; }
+.intro .miss-head { display: flex; align-items: center; gap: .8em; }
+.intro .miss-bar { flex: 1; height: .7em; border-radius: 99px; background: #eee; overflow: hidden; }
+.intro .miss-bar i { display: block; height: 100%; width: 55%; background: #d99a1e; border-radius: 99px; }
+.intro .on .miss-bar i { animation: fillbar 4.2s .9s steps(5, end) both; }
+@keyframes fillbar { from { width: 55%; background: #d99a1e; } to { width: 100%; background: var(--green); } }
+.intro .miss-pct::after { content: '55 %'; font-style: normal; font-weight: 700; }
+.intro .on .miss-pct::after { animation: pct 4.2s .9s steps(1, end) both; }
+@keyframes pct { 0% { content: '55 %'; } 20% { content: '64 %'; } 40% { content: '73 %'; } 60% { content: '82 %'; } 80% { content: '91 %'; } 100% { content: '100 % ✓'; color: var(--green); } }
+.intro .miss-ex ul { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: .4em 1.2em; }
+.intro .miss-ex li { display: grid; grid-template-columns: 8.5em 1fr; border-radius: 6px; padding: .3em .5em; background: #fde2e2; }
+.intro .miss-ex li b { color: var(--muted); font-weight: 600; }
+.intro .miss-ex li span { opacity: 0; }
+.intro .on .miss-ex li { animation: filled .5s calc(var(--d) * 850ms + 1.1s) both; }
+.intro .on .miss-ex li span { animation: rise .4s calc(var(--d) * 850ms + 1.1s) both; }
+.intro .miss-ex li.na span { color: var(--muted); font-style: italic; }
+@keyframes filled { to { background: #f3f8ee; } }
+.intro .miss-note { margin: auto 0 0; color: var(--muted); font-size: .9em; }
+
+/* care texts: two almost identical texts become one, the calendar lists the plants together */
+.intro .txt-ex { position: absolute; left: 7%; right: 7%; top: 31%; bottom: 12%; font-size: clamp(.6rem, 2cqw, .95rem); }
+.intro .txt { position: absolute; left: 0; width: 62%; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: .55em .9em; }
+.intro .txt span { float: right; }
+.intro .txt.a { top: 0; } .intro .txt.b { top: 22%; background: #fff6e0; }
+.intro .txt.merged { top: 11%; border: 2px solid var(--green-2); background: var(--green-soft); font-weight: 600; opacity: 0; }
+.intro .txt-cal { position: absolute; left: 0; right: 0; top: 52%; background: #fff; border-radius: 8px; border-left: 4px solid var(--green); padding: .55em .9em; opacity: 0; }
+.intro .txt-ex .miss-note { position: absolute; left: 0; bottom: 0; }
+.intro .txt.a, .intro .txt.b { opacity: 0; }
+.intro .on .txt.a { animation: rise .4s .4s both, mergeA .6s 2.6s forwards; }
+.intro .on .txt.b { animation: rise .4s .9s both, mergeB .6s 2.6s forwards; }
+@keyframes mergeA { to { transform: translateY(70%); opacity: 0; } }
+@keyframes mergeB { to { transform: translateY(-70%); opacity: 0; } }
+.intro .on .txt.merged { animation: pop .5s 3.1s both; }
+.intro .on .txt-cal { animation: rise .5s 4.1s both; }
+
 /* 5: the grid is the garden */
 .intro .yard-wrap { position: absolute; left: 11%; right: 11%; top: 31%; bottom: 12%; }
 .intro .yard { position: absolute; inset: 0 0 1.4em 0; display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(10, 1fr); gap: 1px; background: rgba(0,0,0,.06); border: 2px solid #7a9a6a; border-radius: 4px; }
@@ -634,6 +690,11 @@ body.signed-out .nav, body.signed-out #lang, body.signed-out .saved { display: n
 @media (prefers-reduced-motion: reduce) {
   .intro *, .intro .on * { animation: none !important; opacity: 1 !important; stroke-dashoffset: 0 !important; }
   .intro .scene:not(.on) { opacity: 0 !important; }
+  .intro .typing { width: auto !important; border-right: 0; }
+  .intro .txt.a, .intro .txt.b { display: none; }
+  .intro .miss-ex li { background: #f3f8ee; }
+  .intro .miss-bar i { width: 100%; background: var(--green); }
+  .intro .miss-pct::after { content: "100 % ✓"; }
 }
 
 .welcome-note { max-width: 720px; margin: 0 auto 1rem; padding: .8rem 1rem; border: 1px solid #f1d9a6; border-left: 4px solid #d99a1e; border-radius: 8px; background: #fff8ea; }
