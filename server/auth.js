@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import { pool, firstGardenerId } from './database.js';
 import { checkedCountry } from './countries.js';
+import { addStarterData } from './starter.js';
 
 const scrypt = promisify(crypto.scrypt);
 const SCRYPT = { N: 16384, r: 8, p: 1 };
@@ -110,7 +111,9 @@ export async function createGardenerWithUser(body) {
       const id = 'g-' + crypto.randomUUID();
       await conn.query('INSERT INTO gardeners (id, name, contact, email, country, created_at) VALUES (?, ?, ?, ?, ?, ?)',
         [id, g.name, g.contact, g.email, g.country || '', new Date()]);
-      return insertUser(conn, id, { email: body.email, password: body.password, name: body.name });
+      const userId = await insertUser(conn, id, { email: body.email, password: body.password, name: body.name });
+      await addStarterData(conn, id, body.lang);
+      return userId;
     });
   } catch (e) {
     if (e.appCode === 'email-taken') throw httpError(400, 'signup-refused');

@@ -11,7 +11,7 @@
     ['data', '💾', 'Data', 'Data']
   ];
   const ROUTES = { '': 'dashboard', gardens: 'gardens', garden: 'garden', plants: 'plants', plant: 'plant',
-    import: 'import', calendar: 'calendar', tech: 'tech', equipment: 'equipment', data: 'data', caretexts: 'caretexts', profile: 'profile' };
+    import: 'import', calendar: 'calendar', tech: 'tech', equipment: 'equipment', data: 'data', caretexts: 'caretexts', profile: 'profile', welcome: 'welcome' };
 
   function route() {
     const parts = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
@@ -78,6 +78,8 @@
   GP.auth.start().then(go => go && GP.load()).then(loaded => {
     if (loaded === false) return;
     document.body.classList.remove('signed-out');
+    // a new gardener sees the Welcome page first (the server sets settings.welcome with the starter plants)
+    if (GP.state.settings.welcome && !GP.readOnly) location.hash = '#/welcome';
     const t = performance.now();
     GP.render();
     GP.startTimes.render = Math.round(performance.now() - t);

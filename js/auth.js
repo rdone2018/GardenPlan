@@ -200,6 +200,7 @@
         delete data.password2;
       }
       if (mode !== 'setup') data.formToken = formToken;
+      if (mode === 'register') data.lang = GP.L('cs', 'en'); // the new gardener's app starts in this language
       btn.disabled = true;
       try {
         await post(mode === 'signin' ? 'api/session' : mode === 'register' ? 'api/register' : 'api/setup', data);
@@ -222,7 +223,7 @@
     render() {
       if (!GP.session) return '<div class="head"><h1>' + L('Profil', 'Profile') + '</h1></div><p class="muted">' + L('Aplikace neběží přes server, přihlašování tu není.', 'The app is not running through the server, there is no sign-in here.') + '</p>';
       return '<div class="head"><h1>👤 ' + esc(GP.session.gardener.name || L('Profil', 'Profile')) + '</h1>' +
-        '<button class="btn" data-act="signout">🚪 ' + L('Odhlásit', 'Sign out') + '</button></div>' +
+        '<span class="row"><a class="btn" href="#/welcome">🌱 ' + L('Jak začít', 'Getting started') + '</a><button class="btn" data-act="signout">🚪 ' + L('Odhlásit', 'Sign out') + '</button></span></div>' +
         '<p class="muted">' + L('Přihlašovací e-mail:', 'Signed in as') + ' <b>' + esc(GP.session.user.email) + '</b> · ' + roleText(GP.session.user) + '</p>' +
         '<div data-profile><p class="muted">' + L('Načítám…', 'Loading…') + '</p></div>';
     },
