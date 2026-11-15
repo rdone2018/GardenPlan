@@ -58,14 +58,24 @@
   function label(e, g, sameGenus) {
     const p = e.p;
     const fact = (k, v) => '<div><b>' + k + '</b><span>' + (v || '—') + '</span></div>';
-    const strip = [
-      ['🌸', L('Kvete', 'Flowers'), p.bloomMonths, GP.colorHex(p) || '#e8a0bf'],
-      ['🧺', L('Sklizeň', 'Harvest'), p.harvestMonths, '#e6a23c'],
-      ['🪴', L('Výsadba', 'Planting'), p.plantMonths, '#8d6e63'],
-      ['🌱', L('Výsev', 'Sowing'), [...(p.sowInMonths || []), ...(p.sowOutMonths || [])], '#9ccc65'],
-      ...careFields().map(f => [f.icon || '•', SHORT[f.key] ? L(SHORT[f.key][0], SHORT[f.key][1]) : GP.fieldLabel(f), GP.careTerms(p, f.key).flatMap(t => t.months || []), '#5d9b52'])
-    ].filter(r => (r[2] || []).length);
-    const care = careFields().map(f => [f, GP.careTerms(p, f.key).filter(t => t.text || (t.months || []).length)]).filter(x => x[1].length);
+    // one section = a row of the year (I–XII in the cells, the months that apply coloured) and its text below;
+    // a section without text keeps one empty line, so every label has the same order and room to write
+    const section = (icon, name, ms, color, texts) => {
+      const on = new Set(ms || []);
+      return '<div class="lb-sec"><div class="lb-bar"><span class="lb-row">' + icon + ' ' + esc(name) + '</span>' +
+        Array.from({ length: 12 }, (_, i) => '<i' + (on.has(i + 1) ? ' class="on" style="--c:' + esc(color) + '"' : '') + '>' + GP.monthShort(i + 1) + '</i>').join('') + '</div>' +
+        (texts.length ? '<div class="lb-txt">' + texts.map(t => '<p>' + t + '</p>').join('') + '</div>' : '<div class="lb-txt lb-blank"></div>') + '</div>';
+    };
+    const sowing = [...(p.sowInMonths || []), ...(p.sowOutMonths || [])];
+    const season = section('🌸', L('Kvete', 'Flowers'), p.bloomMonths, GP.colorHex(p) || '#e8a0bf', GP.colorNames(p) ? [esc(GP.colorNames(p))] : []) +
+      section('🧺', L('Sklizeň', 'Harvest'), p.harvestMonths, '#e6a23c', []) +
+      section('🪴', L('Výsadba', 'Planting'), p.plantMonths, '#8d6e63', p.planting ? [esc(p.planting)] : []) +
+      (sowing.length ? section('🌱', L('Výsev', 'Sowing'), sowing, '#9ccc65', []) : '');
+    const care = careFields().map(f => {
+      const terms = GP.careTerms(p, f.key).filter(t => t.text || (t.months || []).length);
+      const texts = terms.filter(t => t.text || terms.length > 1).map(t => (terms.length > 1 && (t.months || []).length ? '<b>' + esc(months(t.months)) + (t.once ? ' · 1×' : '') + '</b> ' : t.once ? '<b>1×</b> ' : '') + esc(t.text || ''));
+      return section(f.icon || '•', SHORT[f.key] ? L(SHORT[f.key][0], SHORT[f.key][1]) : GP.fieldLabel(f), terms.flatMap(t => t.months || []), '#5d9b52', texts);
+    }).join('');
     const toxic = optList('toxicParts', p.toxicParts);
     return '<article class="lb-card">' +
       '<header class="lb-head">' + photoBox(p) + '<div class="lb-names"><p class="lb-type">' + esc(GP.typeLabel(p.type) || '') + '</p>' +
@@ -78,18 +88,14 @@
       fact(L('Voda', 'Water'), esc(optList('water', p.water))) +
       fact(L('Půda', 'Soil'), esc([optList('soilType', p.soilType), optList('soilPh', p.soilPh)].filter(Boolean).join(', '))) +
       fact(L('Mrazuvzdornost', 'Hardiness'), p.hardiness ? esc(num(p.hardiness)) + ' °C' + (p.usda ? ' (USDA ' + esc(p.usda) + ')' : '') : '') +
-      fact(L('Květ', 'Flower'), esc([GP.colorNames(p), months(p.bloomMonths)].filter(Boolean).join(', '))) +
       fact(L('Jedovatost', 'Toxicity'), esc(toxic && toxic !== opt(GP.PLANT_OPTS.toxicParts || [], 'none') ? toxic + (p.toxicFor ? ' – ' + optList('toxicFor', p.toxicFor) : '') : L('nejedovatá', 'not toxic'))) +
       '</div>' +
-      (strip.length ? '<table class="lb-year"><thead><tr><th></th>' + Array.from({ length: 12 }, (_, i) => '<th>' + GP.monthShort(i + 1) + '</th>').join('') + '</tr></thead><tbody>' +
-        strip.map(([icon, name, ms, color]) => '<tr><td class="lb-row">' + icon + ' ' + esc(name) + '</td>' + Array.from({ length: 12 }, (_, i) => '<td' + (ms.includes(i + 1) ? ' class="on" style="background:' + esc(color) + '"' : '') + '></td>').join('') + '</tr>').join('') +
-        '</tbody></table>' : '') +
-      (care.length ? '<div class="lb-care">' + care.map(([f, terms]) => terms.map(t => '<p><span class="lb-ico">' + (f.icon || '•') + '</span><b>' + esc(months(t.months) || GP.fieldLabel(f)) + (t.once ? ' · 1×' : '') + '</b> ' + esc(t.text || '') + '</p>').join('')).join('') + '</div>' : '') +
-      (p.planting ? '<p class="lb-line"><b>' + L('Výsadba', 'Planting') + ':</b> ' + esc(p.planting) + '</p>' : '') +
-      (p.companions || p.antagonists ? '<p class="lb-line">' + (p.companions ? '<b>✓</b> ' + esc(p.companions) : '') + (p.antagonists ? (p.companions ? ' &nbsp; ' : '') + '<b>✗</b> ' + esc(p.antagonists) : '') + '</p>' : '') +
+      '<div class="lb-secs">' + season + '<h4 class="lb-group">' + L('Péče', 'Care') + '</h4>' + care + '</div>' +
+      '<div class="lb-nb"><div><b>✓ ' + L('Dobří sousedé', 'Good neighbours') + '</b><p>' + esc(p.companions || '') + '</p></div>' +
+      '<div><b>✗ ' + L('Špatní sousedé', 'Bad neighbours') + '</b><p>' + esc(p.antagonists || '') + '</p></div></div>' +
       (p.notes ? '<p class="lb-line lb-note">' + esc(p.notes) + '</p>' : '') +
       '<div class="lb-notes"><span>' + L('Moje poznámky', 'My notes') + '</span></div>' +
-      '<footer class="lb-foot"><span>' + esc(g.name || '') + ' · MeaFlora · ' + today() + '</span>' + (sameGenus.length ? '<span>' + L('Stejný rod: ', 'Same genus: ') + esc(sameGenus.join(', ')) + '</span>' : '') + '</footer>' +
+      '<footer class="lb-foot"><span><b>MeaFlora – ' + esc(g.name || '') + '</b><br>' + today() + '</span>' + (sameGenus.length ? '<span>' + L('Stejný rod: ', 'Same genus: ') + esc(sameGenus.join(', ')) + '</span>' : '') + '</footer>' +
       '</article>';
   }
 
@@ -123,12 +129,12 @@
       const cont = document.createElement('article');
       cont.className = 'lb-card lb-cont';
       cont.style.setProperty('--fs', s);
-      cont.innerHTML = '<header class="lb-conthead"><b>' + esc(card.querySelector('h3').textContent) + '</b> <span>' + L('pokračování', 'continued') + '</span></header><div class="lb-care"></div>';
-      const contCare = cont.querySelector('.lb-care'), foot = card.querySelector('.lb-foot');
-      // planting, neighbours, notes and the note lines go first, then care lines from the end
-      card.querySelectorAll('.lb-line, .lb-notes').forEach(n => cont.appendChild(n));
-      const care = [...card.querySelectorAll('.lb-care > p')];
-      while (over(card) && care.length) contCare.prepend(care.pop());
+      cont.innerHTML = '<header class="lb-conthead"><b>' + esc(card.querySelector('h3').textContent) + '</b> <span>' + L('pokračování', 'continued') + '</span></header><div class="lb-secs"></div>';
+      const contSecs = cont.querySelector('.lb-secs'), foot = card.querySelector('.lb-foot');
+      // neighbours, notes and the note lines go first, then sections from the end (the care heading goes with its first section)
+      card.querySelectorAll('.lb-nb, .lb-line, .lb-notes').forEach(n => cont.appendChild(n));
+      const secs = [...card.querySelectorAll('.lb-secs > .lb-sec, .lb-secs > .lb-group')];
+      while ((over(card) || (secs.length && secs[secs.length - 1].classList.contains('lb-group'))) && secs.length) contSecs.prepend(secs.pop());
       cont.appendChild(foot.cloneNode(true));
       unit.push(cont);
     }
