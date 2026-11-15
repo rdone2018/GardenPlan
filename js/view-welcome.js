@@ -18,26 +18,29 @@
   const months = (p, key) => (p[key] || []).flatMap(t => t.months || []);
   const short = t => { const s = String(t).split(' – ')[0]; return s.length > 60 ? s.slice(0, 58).replace(/[ ,;]+\S*$/, '') + '…' : s; };
 
-  // the care calendar of the starter plants for one month: [icon, text]
+  // the full name with the cultivar, e.g. Jabloň ‘Topaz Red’
+  const full = p => (p ? L(p.name_cs, p.name_en || p.name_cs) + (p.cultivar ? ' ‘' + p.cultivar + '’' : '') : '');
+
+  // the care calendar of the starter plants for one month: [icon, plant, text]
   function tasksFor(plants, m) {
     const perPlant = [];
-    const KINDS = [['plantMonths', '🪴'], ['pruning', '✂️'], ['fertilizing', '🌱'], ['winter', '❄️'], ['pests', '🐛'], ['diseases', '🍂'], ['otherCare', '📝'], ['watering', '💧'], ['harvestMonths', '🧺']];
+    const KINDS = [['pruning', '✂️'], ['fertilizing', '🌱'], ['winter', '❄️'], ['pests', '🐛'], ['diseases', '🍂'], ['otherCare', '📝'], ['watering', '💧'], ['plantMonths', '🪴'], ['harvestMonths', '🧺']];
     for (const p of plants) {
       const out = []; perPlant.push(out);
-      const name = p.name_cs.split(' ')[0];
+      const name = full(p);
       for (const [k, icon] of KINDS) {
         const v = p[k];
         if (!Array.isArray(v)) continue;
         if (typeof v[0] === 'number') {
-          if (v.includes(m)) out.push([icon, (k === 'plantMonths' ? L('Vysadit', 'Plant') : L('Sklízet', 'Harvest')) + ' – ' + name.toLowerCase()]);
+          if (v.includes(m)) out.push([icon, name, k === 'plantMonths' ? L('Vysadit', 'Plant') : L('Sklízet', 'Harvest')]);
         } else {
-          for (const t of v) if ((t.months || []).includes(m)) out.push([icon, name + ': ' + short(t.text)]);
+          for (const t of v) if ((t.months || []).includes(m)) out.push([icon, name, short(t.text)]);
         }
       }
     }
     // one task of each plant in turn, so the list is not all about one plant
     const mixed = [];
-    for (let i = 0; mixed.length < 6 && perPlant.some(l => l[i]); i++) for (const l of perPlant) if (l[i] && mixed.length < 6) mixed.push(l[i]);
+    for (let i = 0; mixed.length < 4 && perPlant.some(l => l[i]); i++) for (const l of perPlant) if (l[i] && mixed.length < 4) mixed.push(l[i]);
     return mixed;
   }
 
@@ -62,35 +65,42 @@
     const gardenCard = '<div class="card-ex"><div class="ex-head" style="--d:0"><span class="ex-ico">🏡</span><div><b>' + L('Moje zahrada', 'My garden') + '</b><i>' + L('zahrada u domu', 'garden by the house') + '</i></div></div>' +
       '<ul class="ex-rows">' +
       row('📍', L('Poloha', 'Location'), L('z mapy → 420 m n. m.', 'from the map → 420 m a.s.l.'), 1) +
-      row('📐', L('Rozměry', 'Size'), L('30 × 20 m (600 m²), mřížka po 1 m', '30 × 20 m (600 m²), 1 m grid'), 2) +
+      row('📐', L('Rozměry', 'Size'), L('40 × 25 m (1 000 m²), mřížka po 1 m', '40 × 25 m (1,000 m²), 1 m grid'), 2) +
       row('🧭', L('Orientace', 'Aspect'), L('na jih', 'south'), 3) +
       row('🪨', L('Půda', 'Soil'), L('hlinitá, pH 6,5', 'loam, pH 6.5'), 4) +
       row('🌡️', L('Nejnižší zimní', 'Lowest in winter'), '−20 °C', 5) +
       row('💧', L('Voda', 'Water'), L('studna, kapková závlaha', 'well, drip irrigation'), 6) +
       '</ul><div class="ex-care">' +
-      [['z-house', L('Dům', 'House')], ['z-lawn', L('Trávník', 'Lawn')], ['z-bed', L('Záhony', 'Beds')], ['z-veg', L('Zelenina', 'Vegetables')], ['z-path', L('Cesta', 'Path')]]
+      [['z-house', L('Dům', 'House')], ['z-lawn', L('Trávník', 'Lawn')], ['z-bed', L('Záhony', 'Beds')], ['z-veg', L('Zelenina', 'Vegetables')], ['z-terrace', L('Terasa', 'Terrace')], ['z-path', L('Cesta', 'Path')]]
         .map(([z, n], k) => '<span style="--d:' + (7 + k) + '"><i class="sw ' + z + '"></i>' + n + '</span>').join('') + '</div></div>';
 
     // 3: the plants go into the garden
-    const into = '<div class="into"><ul class="into-plants">' + plants.map((p, i) => '<li style="--d:' + i + '"><span>' + (EMOJI[p.id] || '🌱') + '</span>' + esc(p.name_cs) + '</li>').join('') + '</ul>' +
+    const COUNTS = { 'starter-apple': 2, 'starter-tomato': 4, 'starter-mint': 1, 'starter-rhododendron': 2, 'starter-sweetgum': 1, 'starter-tulip': 4 };
+    const into = '<div class="into"><ul class="into-plants">' + plants.map((p, i) => '<li style="--d:' + i + '"><span>' + (EMOJI[p.id] || '🌱') + '</span>' + esc(full(p)) + '</li>').join('') + '</ul>' +
       '<div class="into-arrow">→</div><div class="into-garden"><b>🏡 ' + L('Moje zahrada', 'My garden') + '</b><ul>' +
-      plants.map((p, i) => '<li style="--d:' + i + '">' + (EMOJI[p.id] || '🌱') + ' ' + esc(p.name_cs.split(' ')[0]) + ' <em>' + [2, 6, 3, 2, 1, 25][i % 6] + '×</em></li>').join('') + '</ul></div></div>';
+      plants.map((p, i) => '<li style="--d:' + i + '">' + (EMOJI[p.id] || '🌱') + ' ' + esc(full(p)) + ' <em>' + (COUNTS[p.id] || 1) + '×</em></li>').join('') + '</ul></div></div>';
 
     // 4: the care calendar made from those plants: last month and this month
     const now = new Date().getMonth() + 1, prev = now === 1 ? 12 : now - 1;
-    const col = (m, cls) => '<div class="cal-col ' + cls + '"><b>' + esc(GP.monthName(m)) + '</b><ul>' + (tasksFor(plants, m).map(([i, t], k) => '<li style="--d:' + k + '"><span>' + i + '</span>' + esc(t) + '</li>').join('') || '<li class="muted">—</li>') + '</ul></div>';
+    const col = (m, cls) => '<div class="cal-col ' + cls + '"><b>' + esc(GP.monthName(m)) + '</b><ul>' + (tasksFor(plants, m).map(([i, name, t], k) => '<li style="--d:' + k + '"><span>' + i + '</span><div><b>' + esc(name) + '</b>' + esc(t) + '</div></li>').join('') || '<li class="muted">—</li>') + '</ul></div>';
     const calendar = '<div class="cal-ex">' + col(prev, 'prev') + col(now, 'now') + '</div>';
 
-    // 5: the grid is the garden – the house in the middle, lawn, beds, a path, plants around the house
-    const W = 15, H = 10; // 30 x 20 m, one cell = 2 m
-    const zone = (c, r) => (c >= 6 && c <= 8 && r >= 3 && r <= 5) ? 'house' : (c === 7 && r >= 6) ? 'path' : (r === 0 && c >= 2 && c <= 12) ? 'bed' : (c <= 3 && r >= 6) ? 'veg' : 'lawn';
-    const spots = [['🍎', 1, 1], ['🍎', 3, 1], ['🌳', 13, 2], ['🌺', 10, 4], ['🌺', 5, 4], ['🌷', 6, 7], ['🌷', 8, 7], ['🍅', 1, 7], ['🍅', 2, 8], ['🌿', 0, 9]];
-    let cells = '';
-    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) cells += '<i class="' + (zone(c, r) === 'house' ? 'z-house' : 'z-' + zone(c, r)) + '" style="grid-area:' + (r + 1) + '/' + (c + 1) + ';--i:' + (r + c) + '"></i>';
-    const yard = '<div class="yard-wrap"><span class="dim dim-x">30 m</span><span class="dim dim-y">20 m</span><div class="yard">' + cells +
-      '<div class="house-label" style="grid-area:4/7/7/10">🏠 ' + L('Dům', 'House') + '</div>' +
-      spots.map(([e, c, r], i) => '<b style="grid-area:' + (r + 1) + '/' + (c + 1) + ';--d:' + i + '">' + e + '</b>').join('') +
-      '</div><span class="scale">' + L('1 políčko = 2 m', '1 cell = 2 m') + '</span></div>';
+    // 5: the grid is the garden – 40 x 25 m with a 1 m grid (a stronger line every 5 m, as in the plan), the house in
+    // the middle, a terrace, a path to the gate, beds along the fence, a vegetable patch, and the plants around
+    const GW = 40, GH = 25, pct = (v, of) => (v / of * 100) + '%';
+    const box = (x, y, w, h) => 'left:' + pct(x, GW) + ';top:' + pct(y, GH) + ';width:' + pct(w, GW) + ';height:' + pct(h, GH);
+    const areas = [ // [zone, x, y, w, h, label] in metres
+      ['z-bed', 2, 0, 36, 2, ''], ['z-veg', 1, 15, 9, 9, L('Zelenina', 'Vegetables')], ['z-path', 19, 21, 2, 4, ''],
+      ['z-terrace', 16, 18, 8, 3, L('Terasa', 'Terrace')], ['z-house', 14, 7, 12, 11, '🏠 ' + L('Dům 12 × 11 m', 'House 12 × 11 m')]];
+    const spots = [ // [plant id, x, y] in metres
+      ['starter-apple', 5, 5], ['starter-apple', 9, 9], ['starter-sweetgum', 34, 9], ['starter-rhododendron', 12, 10], ['starter-rhododendron', 28, 12],
+      ['starter-tulip', 18, 22], ['starter-tulip', 22, 22], ['starter-tulip', 18, 24], ['starter-tulip', 22, 24],
+      ['starter-tomato', 3, 18.5], ['starter-tomato', 7, 18.5], ['starter-tomato', 3, 21.5], ['starter-tomato', 7, 21.5], ['starter-mint', 5, 23]];
+    const yard = '<div class="yard-wrap"><div class="yard">' +
+      areas.map(([z, x, y, w, h, lab], i) => '<div class="area ' + z + '" style="' + box(x, y, w, h) + ';--d:' + i + '">' + (lab ? '<span>' + esc(lab) + '</span>' : '') + '</div>').join('') +
+      spots.map(([id, x, y], i) => '<b style="left:' + pct(x, GW) + ';top:' + pct(y, GH) + ';--d:' + i + '" title="' + esc(full(plants.find(p => p.id === id))) + '">' + (EMOJI[id] || '🌱') + '</b>').join('') +
+      '<span class="dim dim-x">' + GW + ' m</span><span class="dim dim-y">' + GH + ' m</span></div>' +
+      '<span class="scale">' + L('mřížka 1 × 1 m · silná čára = 5 m', 'grid 1 × 1 m · bold line = 5 m') + '</span></div>';
 
     // 2: fill a plant from open databases (Doplnit z databází: Wikidata, GBIF, Wikimedia Commons)
     const lookup = '<div class="look-ex"><div class="look-search" style="--d:0"><span>🔎</span><b class="typing">' + L('jabloň', 'apple') + '</b><em>' + L('Doplnit z databází', 'Fill from databases') + '</em></div>' +
@@ -101,7 +111,7 @@
       '</ul><div class="look-more" style="--d:8">' + L('a odkazy na hledání: Google · Havlis · Pl@ntNet', 'and search links: Google · Havlis · Pl@ntNet') + '</div></div>';
 
     // 3: what is missing is red; filling it in raises the completeness bar to 100 %
-    const missing = '<div class="miss-ex"><div class="miss-head"><b>🍅 ' + L('Rajče tyčkové', 'Tomato') + '</b><span class="miss-bar"><i></i></span><em class="miss-pct"></em></div><ul>' +
+    const missing = '<div class="miss-ex"><div class="miss-head"><b>🍅 ' + esc(full(plants.find(p => p.id === 'starter-tomato')) || L('Rajče tyčkové', 'Tomato')) + '</b><span class="miss-bar"><i></i></span><em class="miss-pct"></em></div><ul>' +
       [[L('Výška', 'Height'), '70–80 cm'], [L('Světlo', 'Light'), L('plné slunce', 'full sun')], [L('Výsev do skleníku', 'Sow indoors'), 'III–IV'], [L('Hnojení', 'Feeding'), L('od kvetení každé 2 týdny', 'every 2 weeks from flowering')], [L('Podzimní barva', 'Autumn colour'), L('nehodí se', 'does not apply')]]
         .map(([k, v], i) => '<li class="' + (i === 4 ? 'na' : '') + '" style="--d:' + i + '"><b>' + k + '</b><span>' + esc(v) + '</span></li>').join('') +
       '</ul><p class="miss-note">' + L('Červeně = chybí · filtr „chybí: …“ najde rostliny, kde co chybí', 'Red = missing · the "missing: …" filter finds plants with gaps') + '</p></div>';
@@ -110,7 +120,7 @@
     const texts = '<div class="txt-ex"><div class="txt a" style="--d:0">' + L('Na jaře hnojit kompostem', 'Feed with compost in spring') + ' <span>🍎</span></div>' +
       '<div class="txt b" style="--d:1">' + L('na jaře hnojit, kompostem', 'feed with compost, in spring') + ' <span>🌺 🌷</span></div>' +
       '<div class="txt merged">✓ ' + L('Na jaře hnojit kompostem', 'Feed with compost in spring') + ' <span>🍎 🌺 🌷</span></div>' +
-      '<div class="txt-cal">📅 ' + L('Březen', 'March') + ': <b>' + L('Na jaře hnojit kompostem', 'Feed with compost in spring') + '</b> – ' + L('jabloň, rododendron, tulipán', 'apple, rhododendron, tulip') + '</div>' +
+      '<div class="txt-cal">📅 ' + L('Březen', 'March') + ': <b>' + L('Na jaře hnojit kompostem', 'Feed with compost in spring') + '</b> – ' + esc(['starter-apple', 'starter-rhododendron', 'starter-tulip'].map(id => full(plants.find(p => p.id === id))).filter(Boolean).join(', ')) + '</div>' +
       '<p class="miss-note">' + L('Texty péče: sjednocení podobných textů a stejná péče pro celý rod', 'Care texts: unify similar texts and the same care for a whole genus') + '</p></div>';
 
     const scenes = [
