@@ -1,4 +1,4 @@
-# GardenPlan
+# MeaFlora (GardenPlan)
 Planning and monitoring garden – plánování a správa zahrady (CZ / EN).
 
 ## Spuštění / How to run

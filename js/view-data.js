@@ -113,7 +113,7 @@
           } catch (err) { missing++; }
         }
         b.disabled = false;
-        GP.ui.download('gardenplan-zaloha-' + stamp() + '.json', JSON.stringify(data, null, 1), 'application/json');
+        GP.ui.download('meaflora-zaloha-' + stamp() + '.json', JSON.stringify(data, null, 1), 'application/json');
         if (missing) GP.ui.toast(L('Některé fotky se nepodařilo přidat do zálohy: ', 'Some photos could not be added to the backup: ') + missing);
       };
       root.querySelector('[data-act=csv]').onclick = () => GP.ui.download('rostliny-' + stamp() + '.csv', GP.csv.exportPlants(), 'text/csv;charset=utf-8');
@@ -122,7 +122,7 @@
         if (!f) return;
         let data;
         try { data = JSON.parse(await f.text()); } catch (err) { return GP.ui.toast(L('Soubor není platná záloha', 'Not a valid backup file')); }
-        if (!data || !Array.isArray(data.plants) || !Array.isArray(data.gardens)) return GP.ui.toast(L('Soubor není záloha GardenPlan', 'Not a GardenPlan backup'));
+        if (!data || !Array.isArray(data.plants) || !Array.isArray(data.gardens)) return GP.ui.toast(L('Soubor není záloha MeaFlora (GardenPlan)', 'Not a MeaFlora (GardenPlan) backup'));
         if (!confirm(L('Nahradit všechna současná data obsahem zálohy?', 'Replace all current data with the backup?'))) return;
         try {
           await GP.replaceState(data);

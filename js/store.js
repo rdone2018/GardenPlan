@@ -352,7 +352,7 @@ window.GP = window.GP || {};
     times.storage = ms();
 
     const r = await server;
-    console.log('GardenPlan start (ms):', JSON.stringify(times));
+    console.log('MeaFlora start (ms):', JSON.stringify(times));
     if (r.signedOut) { GP.state = emptyState(); GP.auth.signedOut(); return false; }
     if (r.state) return useServerState(r.state, local);
 

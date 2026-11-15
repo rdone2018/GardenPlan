@@ -1,4 +1,4 @@
-// GardenPlan server: serves the web app and stores its data in MariaDB.
+// MeaFlora (GardenPlan) server: serves the web app and stores its data in MariaDB.
 // Start: node server.js   (configuration: see database.js and .env.example)
 // Every gardener's data is kept apart: each data row has gardener_id, and every data route works only with the data
 // of the signed-in user's gardener (see auth.js).
@@ -382,7 +382,7 @@ initDatabase()
   .then(() => countries.seedCountries().catch(e => console.error(new Date().toISOString(), 'filling the countries failed:', e.message)))
   .then(() => auth.ensureAdmin())
   .then(() => movePhotos().catch(e => console.error(new Date().toISOString(), 'moving photos failed:', e.message)))
-  .then(() => app.listen(PORT, () => console.log('GardenPlan: http://localhost:' + PORT + '  (database ' + (env.DB_NAME || 'gardenplan') + ' @ ' + (env.DB_HOST || 'localhost') + ')')))
+  .then(() => app.listen(PORT, () => console.log('MeaFlora: http://localhost:' + PORT + '  (database ' + (env.DB_NAME || 'gardenplan') + ' @ ' + (env.DB_HOST || 'localhost') + ')')))
   .catch(e => {
     console.error('Cannot connect to MariaDB / create tables:', e.message);
     console.error('Check DB_HOST, DB_USER, DB_PASSWORD and DB_NAME in /etc/gardenplan/gardenplan.env (or server/.env)');
