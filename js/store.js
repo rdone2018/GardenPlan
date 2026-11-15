@@ -161,6 +161,7 @@ window.GP = window.GP || {};
       const r = await fetch('api/state', { cache: 'no-store', signal: ctrl.signal }).finally(() => clearTimeout(timer));
       const json = (r.headers.get('content-type') || '').includes('json');
       if (r.ok && json) return { state: await r.json() };
+      if (r.status === 401 && json) return { signedOut: true };
       if (json) { let e = ''; try { e = (await r.json()).error || ''; } catch (x) { /* ignore */ } return { reachable: true, error: 'HTTP ' + r.status + (e ? ' – ' + e : '') }; }
       return { reachable: false, error: 'HTTP ' + r.status };
     } catch (e) {
@@ -215,6 +216,8 @@ window.GP = window.GP || {};
           if (!r.ok) {
             let e = '';
             try { e = (await r.json()).error || ''; } catch (x) { /* proxy error page */ }
+            if (r.status === 401 && e === 'signed-out') { GP.auth.signedOut(); return; }
+            if (r.status === 403 && e === 'guest') { status(GP.auth.errorText('guest'), true); return; }
             throw new Error('HTTP ' + r.status + (r.status === 413 ? ' – ' + GP.L('příliš velký požadavek', 'request too large') : '') + (e ? ' – ' + e : ''));
           }
           let answer = {};
@@ -289,7 +292,8 @@ window.GP = window.GP || {};
     GP.state = merged ? merged.state : Object.assign(emptyState(), serverState);
     setBase();
     syncInfo.mode = 'server';
-    syncInfo.dirty = !!merged && markChanges(true);
+    if (GP.session) syncInfo.gardener = GP.session.gardener.id;
+    syncInfo.dirty = !!merged && !GP.readOnly && markChanges(true);
     writeLocal();
     if (syncInfo.dirty) { status(GP.L('Odesílám změny z tohoto zařízení…', 'Sending the changes from this device…')); setTimeout(syncServer, 300); }
     else status('✓ ' + GP.L('Připojeno k databázi', 'Connected to database'));
@@ -300,6 +304,7 @@ window.GP = window.GP || {};
     clearTimeout(retryTimer);
     retryTimer = setTimeout(async () => {
       const r = await fetchState();
+      if (r.signedOut) return GP.auth.signedOut();
       if (!r.state) return reconnect();
       useServerState(r.state, GP.state);
       if (GP.render) GP.render();
@@ -324,9 +329,21 @@ window.GP = window.GP || {};
       const rows = await inTime(Promise.all([readKey(KEY), readKey(SYNC_KEY), readKey(UNSENT_KEY)]));
       if (rows === LATE) throw new Error('IndexedDB did not answer within 4 s');
       const [l, si, un] = rows;
-      local = l;
-      syncInfo = Object.assign({ mode: 'local', dirty: false }, si);
-      GP.hasUnsent = !!un;
+      // The copy in this browser belongs to one gardener. Signed in as another one, it is not used (and is replaced
+      // by this gardener's data). A copy from before sign-in existed is taken only by the administrator, whose data
+      // it was.
+      const gid = GP.session && GP.session.gardener.id;
+      const owner = si && (si.gardener || (si.mode === 'server' && GP.session && GP.session.user.isAdmin ? gid : null));
+      if (gid && si && si.mode === 'server' && owner !== gid) {
+        local = null;
+        syncInfo = { mode: 'local', dirty: false };
+        GP.hasUnsent = false;
+        if (un) GP.unsent.drop();
+      } else {
+        local = l;
+        syncInfo = Object.assign({ mode: 'local', dirty: false }, si);
+        GP.hasUnsent = !!un;
+      }
     } catch (e) {
       console.error('Storage unavailable', e);
       times.storageError = e.message;
@@ -336,6 +353,7 @@ window.GP = window.GP || {};
 
     const r = await server;
     console.log('GardenPlan start (ms):', JSON.stringify(times));
+    if (r.signedOut) { GP.state = emptyState(); GP.auth.signedOut(); return false; }
     if (r.state) return useServerState(r.state, local);
 
     // A page that got no answer at all is treated the same: Chrome restoring the page from its cache while the server
@@ -363,6 +381,7 @@ window.GP = window.GP || {};
   GP.refresh = async function () {
     if (GP.storageMode !== 'server' || GP.offline || !snap || saveTimer || syncing || syncInfo.dirty) return false;
     const r = await fetchState();
+    if (r.signedOut) { GP.auth.signedOut(); return false; }
     if (!r.state || saveTimer || syncing || syncInfo.dirty) return false;
     const next = snapshot(Object.assign(emptyState(), r.state));
     if (next.meta === snap.meta && COLLECTIONS.every(c => next[c].size === snap[c].size && [...next[c]].every(([id, json]) => snap[c].get(id) === json))) return false;
@@ -375,6 +394,8 @@ window.GP = window.GP || {};
 
   function write() {
     saveTimer = null;
+    // a guest only looks: nothing is kept or sent (the server would refuse it anyway)
+    if (GP.readOnly) return;
     // only real changes count: a "dirty" flag left behind by a page closed mid-save used to make the next visit
     // treat the whole local copy as unsent
     if (GP.storageMode === 'server' && markChanges()) syncInfo.dirty = true;
@@ -390,6 +411,26 @@ window.GP = window.GP || {};
   GP.saveNow = function () {
     clearTimeout(saveTimer);
     write();
+  };
+
+  // Sends what is waiting (before signing out).
+  GP.flush = async function () {
+    GP.saveNow();
+    if (syncing) await syncing;
+  };
+  GP.hasUnsaved = () => GP.storageMode === 'server' && !GP.readOnly && !!syncInfo.dirty;
+
+  // Deletes this browser's copy of the data (signing in or out), so the next user of the browser sees nothing of it.
+  GP.clearLocal = async function () {
+    clearTimeout(saveTimer); clearTimeout(retryTimer);
+    if (db) { try { db.close(); } catch (e) { /* closed */ } db = null; }
+    await new Promise(resolve => {
+      try {
+        const req = indexedDB.deleteDatabase(DB_NAME);
+        req.onsuccess = req.onerror = req.onblocked = () => resolve();
+      } catch (e) { resolve(); }
+      setTimeout(resolve, 3000);
+    });
   };
 
   GP.replaceState = async function (data) {
@@ -410,6 +451,12 @@ window.GP = window.GP || {};
 
   GP.byId = (list, id) => GP.state[list].find(x => x.id === id);
 
-  // Pick the Czech or English text for the current UI language.
-  GP.L = (cs, en) => (GP.state && GP.state.settings.lang === 'en' ? en : cs);
+  // Pick the Czech or English text for the current UI language. Before the data is loaded (the sign-in screen) the
+  // language last chosen in this browser is used, or English for a browser not set to Czech or Slovak.
+  function preLang() {
+    try { const l = localStorage.getItem('gp-lang'); if (l === 'cs' || l === 'en') return l; } catch (e) { /* storage blocked */ }
+    return /^(cs|sk)/i.test(navigator.language || 'cs') ? 'cs' : 'en';
+  }
+  GP.setPreLang = lang => { try { localStorage.setItem('gp-lang', lang); } catch (e) { /* storage blocked */ } };
+  GP.L = (cs, en) => ((GP.state ? GP.state.settings.lang : preLang()) === 'en' ? en : cs);
 })(window.GP);

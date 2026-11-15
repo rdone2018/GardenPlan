@@ -11,7 +11,7 @@
     ['data', '💾', 'Data', 'Data']
   ];
   const ROUTES = { '': 'dashboard', gardens: 'gardens', garden: 'garden', plants: 'plants', plant: 'plant',
-    import: 'import', calendar: 'calendar', tech: 'tech', equipment: 'equipment', data: 'data', caretexts: 'caretexts' };
+    import: 'import', calendar: 'calendar', tech: 'tech', equipment: 'equipment', data: 'data', caretexts: 'caretexts', profile: 'profile' };
 
   function route() {
     const parts = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
@@ -21,6 +21,7 @@
   GP.go = path => { location.hash = '#/' + path; };
 
   GP.render = function () {
+    if (document.body.classList.contains('signed-out')) return; // the sign-in screen stays until signed in
     const r = route();
     // Plants saved with an older field set (also after restoring a backup) are converted once.
     if (GP.state.plants.reduce((ch, p) => GP.migratePlant(p) || ch, false)) GP.save();
@@ -30,7 +31,12 @@
       const active = r.name === path || (path === 'gardens' && r.name === 'garden') || (path === 'plants' && (r.name === 'plant' || r.name === 'import' || r.name === 'caretexts')) ||
         (path === 'tech' && r.name === 'equipment');
       return '<a href="#/' + path + '" class="' + (active ? 'active' : '') + '"><span>' + icon + '</span> ' + L(cs, en) + '</a>';
-    }).join('');
+    }).join('') +
+      // signed in through the server: the gardener's profile and Sign out, at the end of the menu
+      (GP.session ? '<a href="#/profile" class="nav-user' + (r.name === 'profile' ? ' active' : '') + '" title="' + GP.esc(GP.session.user.email) + '"><span>👤</span> ' + GP.esc(GP.session.gardener.name || L('Profil', 'Profile')) + '</a>' +
+        '<button type="button" class="nav-out" data-signout>🚪 ' + L('Odhlásit', 'Sign out') + '</button>' : '');
+    const out = document.querySelector('#nav [data-signout]');
+    if (out) out.onclick = () => GP.auth.signOut();
 
     const lang = GP.state.settings.lang;
     document.getElementById('lang').innerHTML =
@@ -39,7 +45,8 @@
     const view = GP.views[ROUTES[r.name]];
     const page = document.createElement('div');
     page.className = 'page';
-    page.innerHTML = (GP.offline ? '<div class="alert">⚠ ' + L('Nelze se připojit k serveru', 'Cannot reach the server') + (GP.serverError ? ' (' + GP.esc(GP.serverError) + ')' : '') + '. ' +
+    page.innerHTML = (GP.readOnly ? '<div class="alert">👁 ' + L('Jste tu jako <b>host</b>: vše si můžete prohlížet, ale změny se neukládají.', 'You are here as a <b>guest</b>: you can look at everything, but changes are not saved.') + '</div>' : '') +
+      (GP.offline ? '<div class="alert">⚠ ' + L('Nelze se připojit k serveru', 'Cannot reach the server') + (GP.serverError ? ' (' + GP.esc(GP.serverError) + ')' : '') + '. ' +
       L('Zobrazuji poslední kopii uloženou v tomto prohlížeči. Změny se uloží sem a na server se odešlou, jakmile bude znovu dostupný (zkouším každých 10 s).',
         'Showing the last copy saved in this browser. Changes are kept here and sent to the server as soon as it is back (retrying every 10 s).') + '</div>' : '') +
       (GP.hasUnsent && r.name !== 'data' ? '<div class="alert">⚠ ' + L('V tomto prohlížeči zůstaly změny, které se nedostaly na server.', 'This browser holds changes that never reached the server.') +
@@ -55,6 +62,7 @@
     const b = e.target.closest('[data-lang]');
     if (!b) return;
     GP.state.settings.lang = b.dataset.lang;
+    GP.setPreLang(b.dataset.lang);
     GP.saveNow();
     GP.render();
   });
@@ -66,7 +74,10 @@
     else GP.refresh().then(changed => { if (changed) GP.render(); });
   });
 
-  GP.load().then(() => {
+  // Signed in (or no sign-in at all) -> load the data; otherwise the sign-in screen is shown.
+  GP.auth.start().then(go => go && GP.load()).then(loaded => {
+    if (loaded === false) return;
+    document.body.classList.remove('signed-out');
     const t = performance.now();
     GP.render();
     GP.startTimes.render = Math.round(performance.now() - t);
